@@ -1,42 +1,87 @@
 import inspect
-from PyQt5.QtCore import (QSortFilterProxyModel, QRegularExpression)
+from PyQt5.QtCore import (QSortFilterProxyModel, QRegularExpression, QModelIndex)
 from PyQt5.QtGui import (QStandardItemModel, QStandardItem)
 
 class Model():
+    '''Data model for pyspector.'''
+
     def __init__(self):
+        '''Does this appear anywhere?'''
+        self._searchText = ''
+        self._matchCase = False
+        self._includePrivateMembers = False
+
+        # Create the unfiltered tree model.
         self._treeModel = QStandardItemModel()
+
+        # Create regular expressions that exclude or include private members.
+        self._excludePrivateRegEx = QRegularExpression('^[^_]|^__')
+        self._includePrivateRegEx = QRegularExpression('')
+
+        # Create a filtered tree model used to exclude or include private members.
+        self._intermediateTreeModel = QSortFilterProxyModel()
+        self._intermediateTreeModel.setSourceModel(self._treeModel)
+        regEx = self._includePrivateRegEx if self._includePrivateMembers else self._excludePrivateRegEx
+        self._intermediateTreeModel.setFilterRegularExpression(regEx)
+
+        # Create a filtered tree model that matches the search text.
         self._filteredTreeModel = QSortFilterProxyModel()
-        self._filteredTreeModel.setSourceModel(self._treeModel)
-        self._filteredTreeModel.setFilterRegularExpression(QRegularExpression('^[^_]'))
-        self._filteredTreeModel.setFilterKeyColumn(0)
+        self._filteredTreeModel.setSourceModel(self._intermediateTreeModel)
         self._filteredTreeModel.setRecursiveFilteringEnabled(True)
+        self._filteredTreeModel.setFilterFixedString(self._searchText)
+        self._filteredTreeModel.setFilterCaseSensitivity(1 if self._matchCase else 0)
 
     @property
     def filteredTreeModel(self) -> QSortFilterProxyModel:
+        '''The filtered version of the tree model.'''
         return self._filteredTreeModel
 
     @property
-    def searchFilter(self) -> str:
-        return self._searchFilter
+    def searchText(self) -> str:
+        '''The current search text.'''
+        return self._searchText
 
-    @searchFilter.setter
-    def searchFilter(self, value: str) -> None:
-        self._searchFilter = value
+    @searchText.setter
+    def searchText(self, value: str) -> None:
+        self._searchText = value
         self._filteredTreeModel.setFilterFixedString(value)
 
-    def getItemFromIndex(self, index) -> QStandardItem:
-        unfilteredIndex = self._filteredTreeModel.mapToSource(index)
+    @property
+    def matchCase(self) -> bool:
+        '''Whether or not case-sensitive matching is used.'''
+        return self._matchCase
+
+    @matchCase.setter
+    def matchCase(self, value: bool) -> None:
+        self._matchCase = value
+        self._filteredTreeModel.setFilterCaseSensitivity(1 if value else 0)
+
+    @property
+    def includePrivateMembers(self) -> bool:
+        '''Whether or not private members (beginning with "_") are included in the tree.'''
+        return self._includePrivateMembers
+
+    @includePrivateMembers.setter
+    def includePrivateMembers(self, value: bool) -> None:
+        self._includePrivateMembers = value
+        regEx = self._includePrivateRegEx if value else self._excludePrivateRegEx
+        self._intermediateTreeModel.setFilterRegularExpression(regEx)
+
+    def getItemFromIndex(self, index: QModelIndex) -> QStandardItem:
+        '''Returns the model item corresponding to the given index.'''
+        intermediateIndex = self._filteredTreeModel.mapToSource(index)
+        unfilteredIndex = self._intermediateTreeModel.mapToSource(intermediateIndex)
         item = self._treeModel.itemFromIndex(unfilteredIndex)
         return item
 
     def addModules(self, modules: list) -> None:
-        '''Add all the members of the specified modules to the tree.'''
+        '''Adds all the members of the specified modules to the tree.'''
         rootItem = self._treeModel.invisibleRootItem()
         for module in modules:
             item = self._addItem(rootItem, module.__name__, 'module', module)
             self._inspectObject(item, module)
 
-    def _inspectObject(self, parentItem, obj):
+    def _inspectObject(self, parentItem: QStandardItem, obj: object) -> None:
         '''Recursively adds object to the hierarchical model.'''
         for (memberName, memberValue) in inspect.getmembers(obj):
             # Skip "magic" members.
@@ -65,14 +110,16 @@ class Model():
                 if memberValue.fdel:
                     self._addItem(item, '[delete]', 'function', memberValue.fdel)
 
-    def _addItem(self, parentItem, name, type, value):
+    def _addItem(self, parentItem: QStandardItem, name: str, type: str, value: object) -> QStandardItem:
+        '''Adds one model item to a parent model item.'''
         item = QStandardItem(name)
         item.setData({ 'type': type, 'value': value })
         item.setEditable(False)
         parentItem.appendRow(item)
         return item
 
-    def _getMemberType(self, memberValue):
+    def _getMemberType(self, memberValue: object) -> str:
+        '''Attempts to determine the type of a member from its value.'''
         checks = [
             (inspect.ismodule, 'module'),
             (inspect.isclass, 'class'),

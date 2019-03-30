@@ -3,7 +3,7 @@ from markdown import markdown
 from PyQt5.QtCore import (Qt, QSortFilterProxyModel, QRegularExpression)
 from PyQt5.QtGui import (QStandardItemModel, QStandardItem)
 from PyQt5.QtWidgets import (QApplication, QLineEdit, QTreeView, QWidget, QHBoxLayout, QVBoxLayout,
-    QTextBrowser, QSplitter, QMainWindow, QAction)
+    QTextBrowser, QSplitter, QMainWindow, QAction, QCheckBox)
 from Model import Model
 from utilities import openFile
 
@@ -31,6 +31,14 @@ class MainWindow(QMainWindow):
         self.searchEdit.setPlaceholderText('Search')
         self.searchEdit.textChanged.connect(self.searchEditTextChanged)
 
+        self.matchCaseCheckBox = QCheckBox()
+        self.matchCaseCheckBox.setText('Match case')
+        self.matchCaseCheckBox.stateChanged.connect(self.matchCaseCheckBoxStateChanged)
+
+        self.includePrivateCheckBox = QCheckBox()
+        self.includePrivateCheckBox.setText('Include private members (starting with "_")')
+        self.includePrivateCheckBox.stateChanged.connect(self.includePrivateCheckBoxStateChanged)
+
         self.treeView = QTreeView()
         self.treeView.setUniformRowHeights(True)
         self.treeView.setAlternatingRowColors(True)
@@ -38,6 +46,8 @@ class MainWindow(QMainWindow):
 
         leftLayout = QVBoxLayout()
         leftLayout.addWidget(self.searchEdit)
+        leftLayout.addWidget(self.matchCaseCheckBox)
+        leftLayout.addWidget(self.includePrivateCheckBox)
         leftLayout.addWidget(self.treeView)
         leftLayout.setContentsMargins(0, 0, 0, 0)
         leftWidget = QWidget()
@@ -52,7 +62,7 @@ class MainWindow(QMainWindow):
         splitter.setChildrenCollapsible(False)
         splitter.addWidget(leftWidget)
         splitter.addWidget(self.textBrowser)
-        splitter.setSizes([1, 200])
+        splitter.setSizes([300, 900])
 
         centralLayout = QHBoxLayout()
         centralLayout.addWidget(splitter)
@@ -78,7 +88,15 @@ class MainWindow(QMainWindow):
 
     def searchEditTextChanged(self, text):
         '''Filters the tree view to show just those items relevant to the search text.'''
-        self.model.searchFilter = text
+        self.model.searchText = text
+
+    def matchCaseCheckBoxStateChanged(self, state):
+        '''Determines whether matching is case-sensitive.'''
+        self.model.matchCase = state
+
+    def includePrivateCheckBoxStateChanged(self, state):
+        ''' Includes or excludes private members from the tree view.'''
+        self.model.includePrivateMembers = state
 
     def treeViewSelectionChanged(self, index, oldIndex):
         '''Determines which object was selected and displays appropriate info.'''
