@@ -9,9 +9,7 @@ from utilities import openFile
 
 # TODO
 # - Add icons to tree view
-# - Filter by search terms
 # - Show class inheritance hierarchy
-# - Provide option to show/hide "private" members (starting with underscore)
 # - Provide option to show/hide inherited members
 # - Always include built-in modules
 # - Provide a way to add and remove other modules
