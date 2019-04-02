@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (QApplication, QLineEdit, QWidget, QHBoxLayout, QVBo
 from Model import Model
 from TreeView import TreeView
 from utilities import openFile
+from rstToHtml import rstToHtml
 
 # TODO
 # - Always include built-in modules
@@ -199,7 +200,8 @@ class MainWindow(QMainWindow):
         if memberType != 'object':
             doc = inspect.getdoc(data['value'])
             if doc:
-                docHtml = markdown(doc)
+                # docHtml = markdown(doc)
+                docHtml = rstToHtml(doc)
                 html += f'<hr>{docHtml}'
     
         self._textBrowser.setHtml(html)

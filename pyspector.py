@@ -4,6 +4,9 @@ import collections.abc
 import matplotlib
 import matplotlib.pyplot
 import numpy
+import docutils
+import docutils.writers
+import docutils.writers.html4css1
 import sampleCode
 import sys
 from PyQt5.QtWidgets import QApplication
@@ -20,6 +23,9 @@ if __name__ == '__main__':
         matplotlib,
         matplotlib.pyplot,
         numpy,
+        docutils,
+        docutils.writers,
+        docutils.writers.html4css1,
         sampleCode,
         sys,
     ] }
