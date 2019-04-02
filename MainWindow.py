@@ -10,7 +10,7 @@ from utilities import openFile
 # TODO
 # - Always include built-in modules
 # - Provide a way to add and remove other modules
-# - Figure out how to get main menu working
+# - Use left arrow key to move to parent item in tree view
 
 class MainWindow(QMainWindow):
     def __init__(self, config):
@@ -24,7 +24,6 @@ class MainWindow(QMainWindow):
         # Configure window.
         self.setWindowTitle('pyspector')
         self.setGeometry(100, 100, 1200, 800)
-        self.initializeMenu()
 
         # Crete user interface widgets.
         self._searchEdit = QLineEdit()
@@ -92,15 +91,6 @@ class MainWindow(QMainWindow):
 
         # Show the window.
         self.show()
-
-    def initializeMenu(self):
-        mainMenu = self.menuBar()
-        fileMenu = mainMenu.addMenu('File')
-        quitAction = QAction('Quit', self)
-        quitAction.setShortcut('Cmd+Q')
-        quitAction.setStatusTip('Exit application')
-        quitAction.triggered.connect(self.close)
-        fileMenu.addAction(quitAction)
 
     def searchEditTextChanged(self, text):
         '''Filters the tree view to show just those items relevant to the search text.'''
