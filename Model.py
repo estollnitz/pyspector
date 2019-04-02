@@ -76,12 +76,62 @@ class Model():
 
     def addModules(self, modules: list) -> None:
         '''Adds all the members of the specified modules to the tree.'''
-        rootItem = self._treeModel.invisibleRootItem()
         for module in modules:
-            item = self._addItem(rootItem, module.__name__, 'module', module)
-            self._inspectObject(item, module)
+            self._addModule(module)
+        self._filteredTreeModel.sort(0)
 
-    def _inspectObject(self, parentItem: QStandardItem, obj: object) -> None:
+    def _dumpTree(self, parentIndex = QModelIndex(), depth = 0) -> None:
+        rowCount = self._treeModel.rowCount(parentIndex)
+        for row in range(rowCount):
+            index = self._treeModel.index(row, 0, parentIndex)
+            item = self._treeModel.itemFromIndex(index)
+            indent = '  ' * depth
+            id = item.data()['id']
+            print(f'{indent}{id}')
+            self._dumpTree(index, depth + 1)
+
+    def findItem(self, id: str) -> QModelIndex:
+        '''Finds the item with the specified ID.'''
+        print(f'looking for item with id {id}')
+        index = self._findItem(QModelIndex(), id)
+        if index.isValid():
+            # Convert unfiltered index to a filtered index.
+            intermediateIndex = self._intermediateTreeModel.mapFromSource(index)
+            filteredIndex = self._filteredTreeModel.mapFromSource(intermediateIndex)
+            return filteredIndex
+        return index
+
+    def _findItem(self, parentIndex: QModelIndex, id: str) -> QModelIndex:
+        rowCount = self._treeModel.rowCount(parentIndex)
+        for row in range(rowCount):
+            index = self._treeModel.index(row, 0, parentIndex)
+            # Check this item.
+            item = self._treeModel.itemFromIndex(index)
+            if item.data()['id'] == id:
+                return index
+            # Recurse into children.
+            childIndex = self._findItem(index, id)
+            if childIndex.isValid():
+                return childIndex
+        return QModelIndex()
+
+    def _addModule(self, module, depth = 0):
+        # Check to see if module has already been added.
+        rootItem = self._treeModel.invisibleRootItem()
+        if self._parentContainsItem(rootItem, module.__name__):
+            print(f'module {module.__name__} is already present')
+            return
+        item = self._addItem(rootItem, module.__name__, module.__name__, 'module', module)
+        self._inspectObject(item, module, depth)
+
+    def _parentContainsItem(self, parentItem: QStandardItem, id: str) -> bool:
+        for row in range(parentItem.rowCount()):
+            childId = parentItem.child(row).data()['id']
+            if childId == id:
+                return True
+        return False
+
+    def _inspectObject(self, parentItem: QStandardItem, obj: object, depth) -> None:
         '''Recursively adds object to the hierarchical model.'''
         for (memberName, memberValue) in inspect.getmembers(obj):
             # Skip "magic" members.
@@ -92,28 +142,37 @@ class Model():
 
             # Skip modules within modules.
             if memberType == 'module':
+                # TODO: Should we add nested modules? Seems useful, but leads to a segfault in the
+                # case of matplotlib. 
+                #print(f'{"  "*depth}adding nested module {memberName}: {memberValue.__name__}')
+                #self._addModule(memberValue, depth + 1)
                 continue
 
-            item = self._addItem(parentItem, memberName, memberType, memberValue)
+            parentId = parentItem.data()['id']
+            id = f'{parentId}/{memberName}'
+            if self._parentContainsItem(parentItem, id):
+                continue
+            item = self._addItem(parentItem, id, memberName, memberType, memberValue)
 
-            # Recurse into classes.
-            if memberType == 'class':
-                self._inspectObject(item, memberValue)
+            # Recurse into classes (but not if it's the same class we're inspecting).
+            if memberType == 'class' and memberValue != obj:
+                print(f'{"  "*depth}inspecting class {memberName} in module {memberValue.__module__}')
+                self._inspectObject(item, memberValue, depth + 1)
 
             # Recurse into property getter, setter, deleter functions.
             # TODO: Generalize this to data descriptors other than just the 'property' class.
             if type(memberValue) == property:
                 if memberValue.fget:
-                    self._addItem(item, '[get]', 'function', memberValue.fget)
+                    self._addItem(item, f'{id}/get', '[get]', 'function', memberValue.fget)
                 if memberValue.fset:
-                    self._addItem(item, '[set]', 'function', memberValue.fset)
+                    self._addItem(item, f'{id}/set', '[set]', 'function', memberValue.fset)
                 if memberValue.fdel:
-                    self._addItem(item, '[delete]', 'function', memberValue.fdel)
+                    self._addItem(item, f'{id}/delete', '[delete]', 'function', memberValue.fdel)
 
-    def _addItem(self, parentItem: QStandardItem, name: str, type: str, value: object) -> QStandardItem:
+    def _addItem(self, parentItem: QStandardItem, id: str, name: str, type: str, value: object) -> QStandardItem:
         '''Adds one model item to a parent model item.'''
         item = QStandardItem(name)
-        item.setData({ 'type': type, 'value': value })
+        item.setData({ 'id': id, 'type': type, 'value': value })
         item.setEditable(False)
         parentItem.appendRow(item)
         return item

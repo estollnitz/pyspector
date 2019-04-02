@@ -135,23 +135,26 @@ class MainWindow(QMainWindow):
 
         # Display the inheritance hierarchy of classes.
         if memberType == 'class':
-            baseClasses = inspect.getmro(memberValue)
-            if len(baseClasses) > 1:
-                html += '<p><b>Base classes:</b></p><ul>'
-                baseClasses = list(baseClasses)[1:] # omit the first entry
-                for baseClass in reversed(baseClasses):
-                    moduleName = baseClass.__module__
-                    className = baseClass.__qualname__
-                    html += f'<li><a href="item:{moduleName}/{className}">{className}</a> from {moduleName}</li>'
-                html += '</ul>'
-            derivedClasses = memberValue.__subclasses__()
-            if len(derivedClasses) > 0:
-                html += '<p><b>Derived classes:</b></p><ul>'
-                for derivedClass in derivedClasses:
-                    moduleName = derivedClass.__module__
-                    className = derivedClass.__qualname__
-                    html += f'<li><a href="item:{moduleName}/{className}">{className}</a> from {moduleName}</li>'
-                html += '</ul>'
+            try:
+                baseClasses = inspect.getmro(memberValue)
+                if len(baseClasses) > 1:
+                    html += '<p><b>Base classes:</b></p><ul>'
+                    baseClasses = list(baseClasses)[1:] # omit the first entry
+                    for baseClass in reversed(baseClasses):
+                        moduleName = baseClass.__module__
+                        className = baseClass.__qualname__
+                        html += f'<li><a href="item:{moduleName}/{className}">{className}</a> from {moduleName}</li>'
+                    html += '</ul>'
+                derivedClasses = memberValue.__subclasses__()
+                if len(derivedClasses) > 0:
+                    html += '<p><b>Derived classes:</b></p><ul>'
+                    for derivedClass in derivedClasses:
+                        moduleName = derivedClass.__module__
+                        className = derivedClass.__qualname__
+                        html += f'<li><a href="item:{moduleName}/{className}">{className}</a> from {moduleName}</li>'
+                    html += '</ul>'
+            except:
+                pass
 
         # Display the signature of callable objects.
         try:
@@ -173,7 +176,12 @@ class MainWindow(QMainWindow):
 
     def linkClicked(self, url):
         if url.scheme() == 'file':
+            # Open the file in an external application.
             openFile(url.path())
         elif url.scheme() == 'item':
-            parts = url.path().split('/', 2)
-            print(f'select class {parts[1]} in module {parts[0]}.')
+            # Clear the search and select the item (if present in the tree).
+            self.searchEdit.clear()
+            self.model.searchText = ''
+            index = self.model.findItem(url.path())
+            if index.isValid():
+                self.treeView.setCurrentIndex(index)
