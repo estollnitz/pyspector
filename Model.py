@@ -1,6 +1,6 @@
 import inspect
 from PyQt5.QtCore import (QSortFilterProxyModel, QRegularExpression, QModelIndex)
-from PyQt5.QtGui import (QStandardItemModel, QStandardItem)
+from PyQt5.QtGui import (QStandardItemModel, QStandardItem, QIcon)
 
 class Model():
     '''Data model for pyspector.'''
@@ -10,6 +10,18 @@ class Model():
         self._searchText = ''
         self._matchCase = False
         self._includePrivateMembers = False
+
+        # Initialize icons.
+        self._icons = {
+            'module': QIcon('icons/module.svg'),
+            'abstract base class': QIcon('icons/abstract.svg'),
+            'class': QIcon('icons/class.svg'),
+            'function': QIcon('icons/function.svg'),
+            'built-in function': QIcon('icons/function.svg'),
+            'user-defined or built-in function or method': QIcon('icons/function.svg'),
+            'data descriptor': QIcon('icons/property.svg'),
+            'object': QIcon('icons/object.svg')
+        }
 
         # Create the unfiltered tree model.
         self._treeModel = QStandardItemModel()
@@ -155,7 +167,7 @@ class Model():
             item = self._addItem(parentItem, id, memberName, memberType, memberValue)
 
             # Recurse into classes (but not if it's the same class we're inspecting).
-            if memberType == 'class' and memberValue != obj:
+            if 'class' in memberType and memberValue != obj:
                 print(f'{"  "*depth}inspecting class {memberName} in module {memberValue.__module__}')
                 self._inspectObject(item, memberValue, depth + 1)
 
@@ -171,7 +183,8 @@ class Model():
 
     def _addItem(self, parentItem: QStandardItem, id: str, name: str, type: str, value: object) -> QStandardItem:
         '''Adds one model item to a parent model item.'''
-        item = QStandardItem(name)
+        key = type if type in self._icons else 'object'
+        item = QStandardItem(self._icons[key], name)
         item.setData({ 'id': id, 'type': type, 'value': value })
         item.setEditable(False)
         parentItem.appendRow(item)
@@ -181,6 +194,7 @@ class Model():
         '''Attempts to determine the type of a member from its value.'''
         checks = [
             (inspect.ismodule, 'module'),
+            (inspect.isabstract, 'abstract base class'),
             (inspect.isclass, 'class'),
             (inspect.ismethod, 'method'),
             (inspect.isfunction, 'function'),
@@ -195,7 +209,6 @@ class Model():
             (inspect.iscode, 'code'),
             (inspect.isbuiltin, 'built-in function'),
             (inspect.isroutine, 'user-defined or built-in function or method'),
-            (inspect.isabstract, 'abstract base class'),
             (inspect.ismethoddescriptor, 'method descriptor'),
             (inspect.isdatadescriptor, 'data descriptor'),
             (inspect.isgetsetdescriptor, 'get set descriptor'),

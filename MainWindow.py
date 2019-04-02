@@ -8,8 +8,6 @@ from Model import Model
 from utilities import openFile
 
 # TODO
-# - Add icons to tree view
-# - Show class inheritance hierarchy
 # - Provide option to show/hide inherited members
 # - Always include built-in modules
 # - Provide a way to add and remove other modules
@@ -23,7 +21,7 @@ class MainWindow(QMainWindow):
         self.setGeometry(100, 100, 1200, 800)
 
         self.initializeMenu()
- 
+
         self.searchEdit = QLineEdit()
         self.searchEdit.setClearButtonEnabled(True)
         self.searchEdit.setPlaceholderText('Search')
@@ -134,7 +132,7 @@ class MainWindow(QMainWindow):
                 pass
 
         # Display the inheritance hierarchy of classes.
-        if memberType == 'class':
+        if 'class' in memberType:
             try:
                 baseClasses = inspect.getmro(memberValue)
                 if len(baseClasses) > 1:
