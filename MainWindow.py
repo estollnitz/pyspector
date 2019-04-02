@@ -8,7 +8,6 @@ from Model import Model
 from utilities import openFile
 
 # TODO
-# - Provide option to show/hide inherited members
 # - Always include built-in modules
 # - Provide a way to add and remove other modules
 # - Figure out how to get main menu working
@@ -17,47 +16,72 @@ class MainWindow(QMainWindow):
     def __init__(self, config):
         '''Constructs a new MainWindow.'''
         super().__init__()
+
+        # Create model.
+        self._model = Model()
+        self._model.addModules(config['modules'])
+
+        # Configure window.
         self.setWindowTitle('pyspector')
         self.setGeometry(100, 100, 1200, 800)
-
         self.initializeMenu()
 
-        self.searchEdit = QLineEdit()
-        self.searchEdit.setClearButtonEnabled(True)
-        self.searchEdit.setPlaceholderText('Search')
-        self.searchEdit.textChanged.connect(self.searchEditTextChanged)
+        # Crete user interface widgets.
+        self._searchEdit = QLineEdit()
+        self._searchEdit.setClearButtonEnabled(True)
+        self._searchEdit.setPlaceholderText('Search')
+        self._searchEdit.textChanged.connect(self.searchEditTextChanged)
 
-        self.matchCaseCheckBox = QCheckBox()
-        self.matchCaseCheckBox.setText('Match case')
-        self.matchCaseCheckBox.stateChanged.connect(self.matchCaseCheckBoxStateChanged)
+        matchCaseCheckBox = QCheckBox()
+        matchCaseCheckBox.setText('Match case')
+        matchCaseCheckBox.setCheckState(Qt.Checked if self._model.matchCase else Qt.Unchecked)
+        matchCaseCheckBox.stateChanged.connect(self.matchCaseCheckBoxStateChanged)
 
-        self.includePrivateCheckBox = QCheckBox()
-        self.includePrivateCheckBox.setText('Include private members (starting with "_")')
-        self.includePrivateCheckBox.stateChanged.connect(self.includePrivateCheckBoxStateChanged)
+        includePrivateCheckBox = QCheckBox()
+        includePrivateCheckBox.setText('Include private members')
+        includePrivateCheckBox.setCheckState(Qt.Checked if self._model.includePrivateMembers else Qt.Unchecked)
+        includePrivateCheckBox.stateChanged.connect(self.includePrivateCheckBoxStateChanged)
 
-        self.treeView = QTreeView()
-        self.treeView.setUniformRowHeights(True)
-        self.treeView.setAlternatingRowColors(True)
-        self.treeView.setHeaderHidden(True)
+        includeInheritedCheckBox = QCheckBox()
+        includeInheritedCheckBox.setText('Include inherited members')
+        includeInheritedCheckBox.setCheckState(Qt.Checked if self._model.includeInheritedMembers else Qt.Unchecked)
+        includeInheritedCheckBox.stateChanged.connect(self.includeInheritedCheckBoxStateChanged)
+
+        sortByTypeCheckBox = QCheckBox()
+        sortByTypeCheckBox.setText('Sort by type')
+        sortByTypeCheckBox.setCheckState(Qt.Checked if self._model.sortByType else Qt.Unchecked)
+        sortByTypeCheckBox.stateChanged.connect(self.sortByTypeCheckBoxStateChanged)
+
+        self._treeView = QTreeView()
+        self._treeView.setUniformRowHeights(True)
+        self._treeView.setAlternatingRowColors(True)
+        self._treeView.setHeaderHidden(True)
+        self._treeView.setModel(self._model.filteredTreeModel)
+        self._treeView.hideColumn(1)
+        self._treeView.hideColumn(2)
+        selectionModel = self._treeView.selectionModel()
+        selectionModel.currentChanged.connect(self.treeViewSelectionChanged)
 
         leftLayout = QVBoxLayout()
-        leftLayout.addWidget(self.searchEdit)
-        leftLayout.addWidget(self.matchCaseCheckBox)
-        leftLayout.addWidget(self.includePrivateCheckBox)
-        leftLayout.addWidget(self.treeView)
+        leftLayout.addWidget(self._searchEdit)
+        leftLayout.addWidget(matchCaseCheckBox)
+        leftLayout.addWidget(includePrivateCheckBox)
+        leftLayout.addWidget(includeInheritedCheckBox)
+        leftLayout.addWidget(sortByTypeCheckBox)
+        leftLayout.addWidget(self._treeView)
         leftLayout.setContentsMargins(0, 0, 0, 0)
         leftWidget = QWidget()
         leftWidget.setLayout(leftLayout)
 
-        self.textBrowser = QTextBrowser()
-        self.textBrowser.setOpenLinks(False)
-        self.textBrowser.anchorClicked.connect(self.linkClicked)
+        self._textBrowser = QTextBrowser()
+        self._textBrowser.setOpenLinks(False)
+        self._textBrowser.anchorClicked.connect(self.linkClicked)
 
         splitter = QSplitter()
         splitter.setHandleWidth(20)
         splitter.setChildrenCollapsible(False)
         splitter.addWidget(leftWidget)
-        splitter.addWidget(self.textBrowser)
+        splitter.addWidget(self._textBrowser)
         splitter.setSizes([300, 900])
 
         centralLayout = QHBoxLayout()
@@ -65,13 +89,9 @@ class MainWindow(QMainWindow):
         centralWidget = QWidget()
         centralWidget.setLayout(centralLayout)
         self.setCentralWidget(centralWidget)
-        self.show()
 
-        self.model = Model()
-        self.model.addModules(config['modules'])
-        self.treeView.setModel(self.model.filteredTreeModel)
-        selectionModel = self.treeView.selectionModel()
-        selectionModel.currentChanged.connect(self.treeViewSelectionChanged)
+        # Show the window.
+        self.show()
 
     def initializeMenu(self):
         mainMenu = self.menuBar()
@@ -84,19 +104,27 @@ class MainWindow(QMainWindow):
 
     def searchEditTextChanged(self, text):
         '''Filters the tree view to show just those items relevant to the search text.'''
-        self.model.searchText = text
+        self._model.searchText = text
 
     def matchCaseCheckBoxStateChanged(self, state):
         '''Determines whether matching is case-sensitive.'''
-        self.model.matchCase = state
+        self._model.matchCase = state
 
     def includePrivateCheckBoxStateChanged(self, state):
         ''' Includes or excludes private members from the tree view.'''
-        self.model.includePrivateMembers = state
+        self._model.includePrivateMembers = state
+
+    def includeInheritedCheckBoxStateChanged(self, state):
+        ''' Includes or excludes inherited members from the tree view.'''
+        self._model.includeInheritedMembers = state
+
+    def sortByTypeCheckBoxStateChanged(self, state):
+        ''' Includes or excludes private members from the tree view.'''
+        self._model.sortByType = state
 
     def treeViewSelectionChanged(self, index, oldIndex):
         '''Determines which object was selected and displays appropriate info.'''
-        item = self.model.getItemFromIndex(index)
+        item = self._model.getItemFromIndex(index)
         self.displayInfo(item)
 
     def displayInfo(self, item):
@@ -179,7 +207,7 @@ class MainWindow(QMainWindow):
                 docHtml = markdown(doc)
                 html += f'<hr>{docHtml}'
     
-        self.textBrowser.setHtml(html)
+        self._textBrowser.setHtml(html)
 
     def linkClicked(self, url):
         if url.scheme() == 'file':
@@ -187,8 +215,8 @@ class MainWindow(QMainWindow):
             openFile(url.path())
         elif url.scheme() == 'item':
             # Clear the search and select the item (if present in the tree).
-            self.searchEdit.clear()
-            self.model.searchText = ''
-            index = self.model.findItem(url.path())
+            self._searchEdit.clear()
+            self._model.searchText = ''
+            index = self._model.findItem(url.path())
             if index.isValid():
-                self.treeView.setCurrentIndex(index)
+                self._treeView.setCurrentIndex(index)

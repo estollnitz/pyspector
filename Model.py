@@ -6,10 +6,11 @@ class Model():
     '''Data model for pyspector.'''
 
     def __init__(self):
-        '''Does this appear anywhere?'''
         self._searchText = ''
         self._matchCase = False
         self._includePrivateMembers = False
+        self._includeInheritedMembers = False
+        self._sortByType = True
 
         # Initialize icons.
         self._icons = {
@@ -28,15 +29,26 @@ class Model():
         self._excludePrivateRegEx = QRegularExpression('^[^_]|^__')
         self._includePrivateRegEx = QRegularExpression('')
 
+        # Create regular expressions that exclude or include inherited members.
+        self._excludeInheritedRegEx = QRegularExpression('^$')
+        self._includeInheritedRegEx = QRegularExpression('')
+
         # Create a filtered tree model used to exclude or include private members.
         self._intermediateTreeModel = QSortFilterProxyModel()
         self._intermediateTreeModel.setSourceModel(self._treeModel)
-        regEx = self._includePrivateRegEx if self._includePrivateMembers else self._excludePrivateRegEx
-        self._intermediateTreeModel.setFilterRegularExpression(regEx)
+        privateRegEx = self._includePrivateRegEx if self._includePrivateMembers else self._excludePrivateRegEx
+        self._intermediateTreeModel.setFilterRegularExpression(privateRegEx)
+
+        # Create a filtered tree model used to exclude or include inherited members.
+        self._secondIntermediateTreeModel = QSortFilterProxyModel()
+        self._secondIntermediateTreeModel.setSourceModel(self._intermediateTreeModel)
+        self._secondIntermediateTreeModel.setFilterKeyColumn(2)
+        inheritedRegEx = self._includeInheritedRegEx if self._includeInheritedMembers else self._excludeInheritedRegEx
+        self._secondIntermediateTreeModel.setFilterRegularExpression(inheritedRegEx)
 
         # Create a filtered tree model that matches the search text.
         self._filteredTreeModel = QSortFilterProxyModel()
-        self._filteredTreeModel.setSourceModel(self._intermediateTreeModel)
+        self._filteredTreeModel.setSourceModel(self._secondIntermediateTreeModel)
         self._filteredTreeModel.setRecursiveFilteringEnabled(True)
         self._filteredTreeModel.setFilterFixedString(self._searchText)
         self._filteredTreeModel.setFilterCaseSensitivity(1 if self._matchCase else 0)
@@ -77,9 +89,31 @@ class Model():
         regEx = self._includePrivateRegEx if value else self._excludePrivateRegEx
         self._intermediateTreeModel.setFilterRegularExpression(regEx)
 
+    @property
+    def includeInheritedMembers(self) -> bool:
+        '''Whether or not inherited members are included in the tree.'''
+        return self._includeInheritedMembers
+
+    @includeInheritedMembers.setter
+    def includeInheritedMembers(self, value: bool) -> None:
+        self._includeInheritedMembers = value
+        regEx = self._includeInheritedRegEx if value else self._excludeInheritedRegEx
+        self._secondIntermediateTreeModel.setFilterRegularExpression(regEx)
+
+    @property
+    def sortByType(self) -> bool:
+        '''Whether or not  members are sorted by type.'''
+        return self._sortByType
+
+    @sortByType.setter
+    def sortByType(self, value: bool) -> None:
+        self._sortByType = value
+        self._resort()
+
     def getItemFromIndex(self, index: QModelIndex) -> QStandardItem:
         '''Returns the model item corresponding to the given index.'''
-        intermediateIndex = self._filteredTreeModel.mapToSource(index)
+        secondIntermediateIndex = self._filteredTreeModel.mapToSource(index)
+        intermediateIndex = self._secondIntermediateTreeModel.mapToSource(secondIntermediateIndex)
         unfilteredIndex = self._intermediateTreeModel.mapToSource(intermediateIndex)
         item = self._treeModel.itemFromIndex(unfilteredIndex)
         return item
@@ -88,7 +122,15 @@ class Model():
         '''Adds all the members of the specified modules to the tree.'''
         for module in modules:
             self._addModule(module)
-        self._filteredTreeModel.sort(0)
+        self._resort()
+
+    def _resort(self) -> None:
+        # Sort all items alphabetically by name.
+        self._treeModel.sort(0)
+
+        # Optionally, sort by type.
+        if self.sortByType:
+            self._treeModel.sort(1)
 
     def _dumpTree(self, parentIndex = QModelIndex(), depth = 0) -> None:
         rowCount = self._treeModel.rowCount(parentIndex)
@@ -107,7 +149,8 @@ class Model():
         if index.isValid():
             # Convert unfiltered index to a filtered index.
             intermediateIndex = self._intermediateTreeModel.mapFromSource(index)
-            filteredIndex = self._filteredTreeModel.mapFromSource(intermediateIndex)
+            secondIntermediateIndex = self._secondIntermediateTreeModel.mapFromSource(intermediateIndex)
+            filteredIndex = self._filteredTreeModel.mapFromSource(secondIntermediateIndex)
             return filteredIndex
         return index
 
@@ -141,7 +184,7 @@ class Model():
                 return True
         return False
 
-    def _inspectObject(self, parentItem: QStandardItem, obj: object, depth) -> None:
+    def _inspectObject(self, parentItem: QStandardItem, obj: object, depth: int) -> None:
         '''Recursively adds object to the hierarchical model.'''
         for (memberName, memberValue) in inspect.getmembers(obj):
             # Skip "magic" members.
@@ -158,11 +201,17 @@ class Model():
                 #self._addModule(memberValue, depth + 1)
                 continue
 
+            # Don't add the same item twice.
             parentId = parentItem.data()['id']
             id = f'{parentId}/{memberName}'
             if self._parentContainsItem(parentItem, id):
                 continue
-            item = self._addItem(parentItem, id, memberName, memberType, memberValue)
+
+            # Check inheritance of class members.
+            inheritance = 'inherited' if inspect.isclass(obj) and memberName not in obj.__dict__ else ''
+
+            # Add an item for the current member.
+            item = self._addItem(parentItem, id, memberName, memberType, memberValue, inheritance)
 
             # Recurse into classes (but not if it's the same class we're inspecting).
             if 'class' in memberType and memberValue != obj:
@@ -179,14 +228,19 @@ class Model():
                 if memberValue.fdel:
                     self._addItem(item, f'{id}/delete', '[delete]', 'function', memberValue.fdel)
 
-    def _addItem(self, parentItem: QStandardItem, id: str, name: str, type: str, value: object) -> QStandardItem:
+    def _addItem(self, parentItem: QStandardItem, id: str, name: str, type: str, value: object,
+                 inheritance: str = '') -> QStandardItem:
         '''Adds one model item to a parent model item.'''
         key = type if type in self._icons else 'object'
-        item = QStandardItem(self._icons[key], name)
-        item.setData({ 'id': id, 'type': type, 'value': value })
-        item.setEditable(False)
-        parentItem.appendRow(item)
-        return item
+        item1 = QStandardItem(self._icons[key], name)
+        item1.setData({ 'id': id, 'type': type, 'value': value })
+        item1.setEditable(False)
+        item2 = QStandardItem(type)
+        item2.setEditable(False)
+        item3 = QStandardItem(inheritance)
+        item3.setEditable(False)
+        parentItem.appendRow([item1, item2, item3])
+        return item1
 
     def _getMemberType(self, memberValue: object) -> str:
         '''Attempts to determine the type of a member from its value.'''
