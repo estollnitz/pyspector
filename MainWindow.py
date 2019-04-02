@@ -11,6 +11,8 @@ from utilities import openFile
 # TODO
 # - Always include built-in modules
 # - Provide a way to add and remove other modules
+# - Handle Restructured Text doc strings, not just markdown (e.g., for numpy and matplotlib).
+# - Offer to open modules when user clicks on a link to an as-yet unloaded object.
 
 class MainWindow(QMainWindow):
     def __init__(self, config):
