@@ -17,9 +17,7 @@ class Model():
             'abstract base class': QIcon('icons/abstract.svg'),
             'class': QIcon('icons/class.svg'),
             'function': QIcon('icons/function.svg'),
-            'built-in function': QIcon('icons/function.svg'),
-            'user-defined or built-in function or method': QIcon('icons/function.svg'),
-            'data descriptor': QIcon('icons/property.svg'),
+            'property': QIcon('icons/property.svg'),
             'object': QIcon('icons/object.svg')
         }
 
@@ -192,31 +190,14 @@ class Model():
 
     def _getMemberType(self, memberValue: object) -> str:
         '''Attempts to determine the type of a member from its value.'''
-        checks = [
-            (inspect.ismodule, 'module'),
-            (inspect.isabstract, 'abstract base class'),
-            (inspect.isclass, 'class'),
-            (inspect.ismethod, 'method'),
-            (inspect.isfunction, 'function'),
-            (inspect.isgeneratorfunction, 'generator function'),
-            (inspect.isgenerator, 'generator'),
-            (inspect.iscoroutine, 'coroutine'),
-            (inspect.isawaitable, 'awaitable'),
-            (inspect.isasyncgenfunction, 'async generator function'),
-            (inspect.isasyncgen, 'async generator iterator'),
-            (inspect.istraceback, 'traceback'),
-            (inspect.isframe, 'frame'),
-            (inspect.iscode, 'code'),
-            (inspect.isbuiltin, 'built-in function'),
-            (inspect.isroutine, 'user-defined or built-in function or method'),
-            (inspect.ismethoddescriptor, 'method descriptor'),
-            (inspect.isdatadescriptor, 'data descriptor'),
-            (inspect.isgetsetdescriptor, 'get set descriptor'),
-            (inspect.ismemberdescriptor, 'member descriptor'),
-        ]
-        for (check, typeName) in checks:
-            if check(memberValue):
-                return typeName
-        typeName = str(type(memberValue))
-        typeName = typeName.replace("<class '", '').replace("'>", '')
-        return typeName
+        if inspect.ismodule(memberValue):
+            return 'module'
+        if inspect.isabstract(memberValue):
+            return 'abstract base class'
+        if inspect.isclass(memberValue):
+            return 'class'
+        if inspect.isfunction(memberValue) or inspect.isbuiltin(memberValue) or inspect.isroutine(memberValue):
+            return 'function'
+        if inspect.isdatadescriptor(memberValue):
+            return 'property'
+        return 'object'

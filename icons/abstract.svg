@@ -1,15 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Generator: Adobe Illustrator 23.0.2, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
 <svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
-	 viewBox="0 0 48 48" style="enable-background:new 0 0 48 48;" xml:space="preserve">
-<style type="text/css">
-	.st0{fill:#ED1E79;}
-	.st1{fill:#FFFFFF;}
-	.st2{font-family:'ArialMT';}
-	.st3{font-size:48px;}
-</style>
-<g>
-	<path class="st0" d="M42,48H6c-3.31,0-6-2.69-6-6V6c0-3.31,2.69-6,6-6h36c3.31,0,6,2.69,6,6v36C48,45.31,45.31,48,42,48z"/>
+	 viewBox="0 0 48 48" enable-background="new 0 0 48 48" xml:space="preserve">
+<font horiz-adv-x="2048">
+<!-- Arial is a trademark of The Monotype Corporation in the United States and/or other countries. -->
+<!-- Copyright: Copyright 2019 Adobe System Incorporated. All rights reserved. -->
+<font-face font-family="ArialMT" units-per-em="2048" underline-position="-217" underline-thickness="150"/>
+<missing-glyph horiz-adv-x="1536" d="M256,0l0,1280l1024,0l0,-1280M288,32l960,0l0,1216l-960,0z"/>
+<glyph unicode="A" horiz-adv-x="1366" d="M-3,0l563,1466l209,0l600,-1466l-221,0l-171,444l-613,0l-161,-444M420,602l497,0l-153,406C717,1131 683,1233 660,1312C641,1218 615,1125 581,1032z"/>
+</font>
+
+	<g>
+	<path fill="#ED1E79" d="M42,48H6c-3.31,0-6-2.69-6-6V6c0-3.31,2.69-6,6-6h36c3.31,0,6,2.69,6,6v36C48,45.31,45.31,48,42,48z"/>
 </g>
-<text transform="matrix(1 0 0 1 7.9922 40.803)" class="st1 st2 st3">A</text>
+<text transform="matrix(1 0 0 1 7.9922 40.803)" fill="#FFFFFF" font-family="'ArialMT'" font-size="48px">A</text>
 </svg>

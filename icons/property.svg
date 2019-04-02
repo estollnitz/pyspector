@@ -8,7 +8,15 @@
 	.st2{font-family:'Arial-ItalicMT';}
 	.st3{font-size:48px;}
 </style>
-<g>
+<font horiz-adv-x="2048">
+<!-- Arial is a trademark of The Monotype Corporation in the United States and/or other countries. -->
+<!-- Copyright: Copyright 2019 Adobe System Incorporated. All rights reserved. -->
+<font-face font-family="Arial-ItalicMT" units-per-em="2048" underline-position="-217" underline-thickness="150"/>
+<missing-glyph horiz-adv-x="1536" d="M256,0l0,1280l1024,0l0,-1280M288,32l960,0l0,1216l-960,0z"/>
+<glyph unicode="p" horiz-adv-x="1139" d="M-21,-407l307,1469l167,0l-31,-148C484,979 540,1024 589,1049C638,1074 689,1086 744,1086C845,1086 929,1049 996,976C1063,902 1096,796 1096,659C1096,548 1078,448 1041,357C1004,266 959,192 906,137C853,82 799,41 744,15C689,-11 633,-24 576,-24C449,-24 350,41 280,170l-120,-577M337,434C337,355 343,300 354,269C371,226 398,191 436,164C474,137 518,124 568,124C672,124 756,183 820,300C884,417 916,536 916,658C916,748 895,818 852,867C809,916 755,940 691,940C645,940 602,928 563,904C524,879 487,843 454,795C420,746 392,687 370,617C348,547 337,486 337,434z"/>
+</font>
+
+	<g>
 	<path class="st0" d="M42,48H6c-3.31,0-6-2.69-6-6V6c0-3.31,2.69-6,6-6h36c3.31,0,6,2.69,6,6v36C48,45.31,45.31,48,42,48z"/>
 </g>
 <text transform="matrix(1 0 0 1 11.6523 35.803)" class="st1 st2 st3">p</text>

@@ -117,7 +117,15 @@ class MainWindow(QMainWindow):
             html += f'<h2>{memberValue.__qualname__}</h2>'
 
         # Display the type.
-        html += f'<p><b>Type:</b> {memberType}</p>'
+        displayType = memberType
+        if memberType == 'object':
+            displayType = str(type(memberValue))
+            displayType = displayType.replace("<class '", '').replace("'>", '')
+        html += f'<p><b>Type:</b> {displayType}</p>'
+
+        # Display object value.
+        if memberType == 'object':
+            html += f'<p><b>Value:</b> {repr(memberValue)}'
 
         # Display the filename for modules.
         # See if we can find the source file for other objects.
@@ -164,11 +172,12 @@ class MainWindow(QMainWindow):
         except:
             pass
 
-        # Display any documentation, converting from markdown to HTML.
-        doc = inspect.getdoc(data['value'])
-        if doc:
-            docHtml = markdown(doc)
-            html += f'<hr>{docHtml}'
+        # Display documentation for non-object types, converting from markdown to HTML.
+        if memberType != 'object':
+            doc = inspect.getdoc(data['value'])
+            if doc:
+                docHtml = markdown(doc)
+                html += f'<hr>{docHtml}'
     
         self.textBrowser.setHtml(html)
 
