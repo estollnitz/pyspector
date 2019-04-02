@@ -2,15 +2,15 @@ import inspect
 from markdown import markdown
 from PyQt5.QtCore import (Qt, QSortFilterProxyModel, QRegularExpression)
 from PyQt5.QtGui import (QStandardItemModel, QStandardItem)
-from PyQt5.QtWidgets import (QApplication, QLineEdit, QTreeView, QWidget, QHBoxLayout, QVBoxLayout,
+from PyQt5.QtWidgets import (QApplication, QLineEdit, QWidget, QHBoxLayout, QVBoxLayout,
     QTextBrowser, QSplitter, QMainWindow, QAction, QCheckBox)
 from Model import Model
+from TreeView import TreeView
 from utilities import openFile
 
 # TODO
 # - Always include built-in modules
 # - Provide a way to add and remove other modules
-# - Use left arrow key to move to parent item in tree view
 
 class MainWindow(QMainWindow):
     def __init__(self, config):
@@ -51,7 +51,7 @@ class MainWindow(QMainWindow):
         sortByTypeCheckBox.setCheckState(Qt.Checked if self._model.sortByType else Qt.Unchecked)
         sortByTypeCheckBox.stateChanged.connect(self.sortByTypeCheckBoxStateChanged)
 
-        self._treeView = QTreeView()
+        self._treeView = TreeView()
         self._treeView.setUniformRowHeights(True)
         self._treeView.setAlternatingRowColors(True)
         self._treeView.setHeaderHidden(True)
@@ -115,7 +115,10 @@ class MainWindow(QMainWindow):
     def treeViewSelectionChanged(self, index, oldIndex):
         '''Determines which object was selected and displays appropriate info.'''
         item = self._model.getItemFromIndex(index)
-        self.displayInfo(item)
+        if item:
+            self.displayInfo(item)
+        else:
+            self._textBrowser.clear()
 
     def displayInfo(self, item):
         '''Updates the detailed view to show information about the selected object.'''
