@@ -9,6 +9,7 @@ A simple user interface for inspecting Python modules
 - Some Python packages:
 
     ```sh
+    pip3 install docutils
     pip3 install markdown
     pip3 install PyQt5
     ```
