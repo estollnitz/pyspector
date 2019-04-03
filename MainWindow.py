@@ -1,9 +1,10 @@
 import inspect
 from markdown import markdown
-from PyQt5.QtCore import (Qt, QSortFilterProxyModel, QRegularExpression)
+from PyQt5.QtCore import (Qt, QSortFilterProxyModel, QRegularExpression, QUrl)
 from PyQt5.QtGui import (QStandardItemModel, QStandardItem)
 from PyQt5.QtWidgets import (QApplication, QLineEdit, QWidget, QHBoxLayout, QVBoxLayout,
     QTextBrowser, QSplitter, QMainWindow, QAction, QCheckBox)
+import webbrowser
 from Model import Model
 from TreeView import TreeView
 from utilities import openFile
@@ -12,8 +13,9 @@ from rstToHtml import rstToHtml
 # TODO
 # - Always include built-in modules
 # - Provide a way to add and remove other modules
-# - Handle Restructured Text doc strings, not just markdown (e.g., for numpy and matplotlib).
 # - Offer to open modules when user clicks on a link to an as-yet unloaded object.
+# - Remember the user's navigation history and provide back/forward navigation buttons.
+# - Within classes, distinguish between instance methods, class methods, and static methods.
 
 class MainWindow(QMainWindow):
     def __init__(self, config):
@@ -196,21 +198,27 @@ class MainWindow(QMainWindow):
         except:
             pass
 
-        # Display documentation for non-object types, converting from markdown to HTML.
+        # Display documentation for non-object types, converting from reStructuredText or markdown
+        # to HTML.
         if memberType != 'object':
             doc = inspect.getdoc(data['value'])
             if doc:
-                # docHtml = markdown(doc)
-                docHtml = rstToHtml(doc)
+                try:
+                    docHtml = rstToHtml(doc)
+                except:
+                    docHtml = markdown(doc)
                 html += f'<hr>{docHtml}'
     
         self._textBrowser.setHtml(html)
 
-    def linkClicked(self, url):
-        if url.scheme() == 'file':
+    def linkClicked(self, url: QUrl):
+        scheme = url.scheme()
+        if scheme == 'file':
             # Open the file in an external application.
             openFile(url.path())
-        elif url.scheme() == 'item':
+        elif scheme == 'http' or scheme == 'https':
+            webbrowser.open_new_tab(url.toString())
+        elif scheme == 'item':
             # Clear the search and select the item (if present in the tree).
             self._searchEdit.clear()
             self._model.searchText = ''
