@@ -187,11 +187,11 @@ class Model():
     def _inspectObject(self, parentItem: QStandardItem, obj: object, depth: int) -> None:
         '''Recursively adds object to the hierarchical model.'''
         for (memberName, memberValue) in inspect.getmembers(obj):
-            # Skip "magic" members.
-            if memberName.startswith('__'):
-                continue
-
             memberType = self._getMemberType(memberValue)
+
+            # Skip "magic" members that are classes -- they cause problems.
+            if memberName.startswith('__') and memberType == 'class':
+                continue
 
             # Skip modules within modules.
             if memberType == 'module':

@@ -1,7 +1,7 @@
 import inspect
 from html import escape
 from markdown import markdown
-from PyQt5.QtCore import (Qt, QSortFilterProxyModel, QRegularExpression, QUrl)
+from PyQt5.QtCore import (Qt, QSortFilterProxyModel, QRegularExpression, QUrl, QModelIndex)
 from PyQt5.QtGui import (QStandardItemModel, QStandardItem)
 from PyQt5.QtWidgets import (QApplication, QLineEdit, QWidget, QHBoxLayout, QVBoxLayout,
     QTextBrowser, QSplitter, QMainWindow, QAction, QCheckBox)
@@ -17,9 +17,10 @@ from rstToHtml import rstToHtml
 # - Offer to open modules when user clicks on a link to an as-yet unloaded object.
 # - Remember the user's navigation history and provide back/forward navigation buttons.
 # - Within classes, distinguish between instance methods, class methods, and static methods.
+# - Add support for reStructuredText ".. versionAdded::" directive (e.g., in numpy.sum).
 
 class MainWindow(QMainWindow):
-    def __init__(self, config):
+    def __init__(self, config: dict):
         '''Constructs a new MainWindow.'''
         super().__init__()
 
@@ -98,27 +99,27 @@ class MainWindow(QMainWindow):
         # Show the window.
         self.show()
 
-    def searchEditTextChanged(self, text):
+    def searchEditTextChanged(self, text: str) -> None:
         '''Filters the tree view to show just those items relevant to the search text.'''
         self._model.searchText = text
 
-    def matchCaseCheckBoxStateChanged(self, state):
+    def matchCaseCheckBoxStateChanged(self, state: bool) -> None:
         '''Determines whether matching is case-sensitive.'''
         self._model.matchCase = state
 
-    def includePrivateCheckBoxStateChanged(self, state):
+    def includePrivateCheckBoxStateChanged(self, state: bool) -> None:
         ''' Includes or excludes private members from the tree view.'''
         self._model.includePrivateMembers = state
 
-    def includeInheritedCheckBoxStateChanged(self, state):
+    def includeInheritedCheckBoxStateChanged(self, state: bool) -> None:
         ''' Includes or excludes inherited members from the tree view.'''
         self._model.includeInheritedMembers = state
 
-    def sortByTypeCheckBoxStateChanged(self, state):
+    def sortByTypeCheckBoxStateChanged(self, state: bool) -> None:
         ''' Includes or excludes private members from the tree view.'''
         self._model.sortByType = state
 
-    def treeViewSelectionChanged(self, index, oldIndex):
+    def treeViewSelectionChanged(self, index: QModelIndex, oldIndex: QModelIndex) -> None:
         '''Determines which object was selected and displays appropriate info.'''
         item = self._model.getItemFromIndex(index)
         if item:
@@ -126,7 +127,7 @@ class MainWindow(QMainWindow):
         else:
             self._textBrowser.clear()
 
-    def displayInfo(self, item):
+    def displayInfo(self, item: QStandardItem) -> None:
         '''Updates the detailed view to show information about the selected object.'''
         data = item.data()
         memberType = data['type']
@@ -191,11 +192,8 @@ class MainWindow(QMainWindow):
 
         # Display the signature of callable objects.
         try:
-            sig = inspect.signature(memberValue)
-            sigText = str(sig)
-            # if sig.return_annotation != inspect.Signature.empty:
-            #     sigText += f' -> {sig.return_annotation}'
-            html += f'<p><b>Signature:</b> {memberValue.__name__}{sigText}</p>'
+            signature = str(inspect.signature(memberValue))
+            html += f'<p><b>Signature:</b> {memberValue.__name__}{signature}</p>'
         except:
             pass
 
@@ -212,12 +210,13 @@ class MainWindow(QMainWindow):
     
         self._textBrowser.setHtml(html)
 
-    def linkClicked(self, url: QUrl):
+    def linkClicked(self, url: QUrl) -> None:
         scheme = url.scheme()
         if scheme == 'file':
             # Open the file in an external application.
             openFile(url.path())
         elif scheme == 'http' or scheme == 'https':
+            # Open the web page in the default browser.
             webbrowser.open_new_tab(url.toString())
         elif scheme == 'item':
             # Clear the search and select the item (if present in the tree).
