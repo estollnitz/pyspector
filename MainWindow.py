@@ -15,9 +15,9 @@ from rstToHtml import rstToHtml
 # - Always include built-in modules
 # - Provide a way to add and remove other modules
 # - Offer to open modules when user clicks on a link to an as-yet unloaded object.
+# - Resolve links that are relative to the current module or parent module (e.g., in docutils.writers.get_writer_class).
 # - Remember the user's navigation history and provide back/forward navigation buttons.
 # - Within classes, distinguish between instance methods, class methods, and static methods.
-# - Add support for reStructuredText ".. versionAdded::" directive (e.g., in numpy.sum).
 
 class MainWindow(QMainWindow):
     def __init__(self, config: dict):
@@ -148,8 +148,7 @@ class MainWindow(QMainWindow):
         displayType = memberType
         if memberType == 'object':
             displayType = str(type(memberValue))
-            displayType = displayType.replace("<class '", '').replace("'>", '')
-        html += f'<p><b>Type:</b> {displayType}</p>'
+        html += f'<p><b>Type:</b> {escape(displayType)}</p>'
 
         # Display object value.
         if memberType == 'object':
@@ -202,10 +201,18 @@ class MainWindow(QMainWindow):
         if memberType != 'object':
             doc = inspect.getdoc(data['value'])
             if doc:
-                try:
-                    docHtml = rstToHtml(doc)
-                except:
-                    docHtml = markdown(doc)
+                # Check for special cases where docstrings are plain text.
+                if fullName in ['sys']:
+                    docHtml = f'<pre>{escape(doc)}</pre>'
+                else:
+                    # If we encounter improper reStructuredText markup leading to an exception
+                    # or a "problematic" span, just treat the input as markdown.
+                    try:
+                        docHtml = rstToHtml(doc)
+                        if '<span class="problematic"' in docHtml:
+                            docHtml = markdown(doc)
+                    except:
+                        docHtml = markdown(doc)
                 html += f'<hr>{docHtml}'
     
         self._textBrowser.setHtml(html)
