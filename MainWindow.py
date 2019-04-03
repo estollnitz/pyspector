@@ -1,4 +1,5 @@
 import inspect
+from html import escape
 from markdown import markdown
 from PyQt5.QtCore import (Qt, QSortFilterProxyModel, QRegularExpression, QUrl)
 from PyQt5.QtGui import (QStandardItemModel, QStandardItem)
@@ -151,7 +152,7 @@ class MainWindow(QMainWindow):
 
         # Display object value.
         if memberType == 'object':
-            html += f'<p><b>Value:</b> {repr(memberValue)}'
+            html += f'<p><b>Value:</b> {escape(repr(memberValue))}'
 
         # Display the filename for modules.
         # See if we can find the source file for other objects.
