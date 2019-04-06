@@ -4,8 +4,9 @@ from markdown import markdown
 from PyQt5.QtCore import (Qt, QSortFilterProxyModel, QRegularExpression, QUrl, QModelIndex)
 from PyQt5.QtGui import (QStandardItemModel, QStandardItem)
 from PyQt5.QtWidgets import (QApplication, QLineEdit, QWidget, QHBoxLayout, QVBoxLayout,
-    QTextBrowser, QSplitter, QMainWindow, QAction, QCheckBox)
+    QTextBrowser, QSplitter, QMainWindow, QAction, QCheckBox, QPushButton)
 import webbrowser
+from ModuleSelectionDialog import ModuleSelectionDialog
 from Model import Model
 from TreeView import TreeView
 from utilities import openFile
@@ -18,6 +19,7 @@ from rstToHtml import rstToHtml
 # - Resolve links that are relative to the current module or parent module (e.g., in docutils.writers.get_writer_class).
 # - Remember the user's navigation history and provide back/forward navigation buttons.
 # - Within classes, distinguish between instance methods, class methods, and static methods.
+# - Allow a selected module to be removed using a context menu command or the Delete or Backspace key. 
 
 class MainWindow(QMainWindow):
     def __init__(self, config: dict):
@@ -25,8 +27,9 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         # Create model.
+        self._moduleNames = config['moduleNames']
         self._model = Model()
-        self._model.addModules(config['modules'])
+        self._model.setModuleNames(self._moduleNames)
 
         # Configure window.
         self.setWindowTitle('pyspector')
@@ -36,27 +39,27 @@ class MainWindow(QMainWindow):
         self._searchEdit = QLineEdit()
         self._searchEdit.setClearButtonEnabled(True)
         self._searchEdit.setPlaceholderText('Search')
-        self._searchEdit.textChanged.connect(self.searchEditTextChanged)
+        self._searchEdit.textChanged.connect(self._searchEditTextChanged)
 
         matchCaseCheckBox = QCheckBox()
         matchCaseCheckBox.setText('Match case')
         matchCaseCheckBox.setCheckState(Qt.Checked if self._model.matchCase else Qt.Unchecked)
-        matchCaseCheckBox.stateChanged.connect(self.matchCaseCheckBoxStateChanged)
+        matchCaseCheckBox.stateChanged.connect(self._matchCaseCheckBoxStateChanged)
 
         includePrivateCheckBox = QCheckBox()
         includePrivateCheckBox.setText('Include private members')
         includePrivateCheckBox.setCheckState(Qt.Checked if self._model.includePrivateMembers else Qt.Unchecked)
-        includePrivateCheckBox.stateChanged.connect(self.includePrivateCheckBoxStateChanged)
+        includePrivateCheckBox.stateChanged.connect(self._includePrivateCheckBoxStateChanged)
 
         includeInheritedCheckBox = QCheckBox()
         includeInheritedCheckBox.setText('Include inherited members')
         includeInheritedCheckBox.setCheckState(Qt.Checked if self._model.includeInheritedMembers else Qt.Unchecked)
-        includeInheritedCheckBox.stateChanged.connect(self.includeInheritedCheckBoxStateChanged)
+        includeInheritedCheckBox.stateChanged.connect(self._includeInheritedCheckBoxStateChanged)
 
         sortByTypeCheckBox = QCheckBox()
         sortByTypeCheckBox.setText('Sort by type')
         sortByTypeCheckBox.setCheckState(Qt.Checked if self._model.sortByType else Qt.Unchecked)
-        sortByTypeCheckBox.stateChanged.connect(self.sortByTypeCheckBoxStateChanged)
+        sortByTypeCheckBox.stateChanged.connect(self._sortByTypeCheckBoxStateChanged)
 
         self._treeView = TreeView()
         self._treeView.setUniformRowHeights(True)
@@ -66,7 +69,11 @@ class MainWindow(QMainWindow):
         self._treeView.hideColumn(1)
         self._treeView.hideColumn(2)
         selectionModel = self._treeView.selectionModel()
-        selectionModel.currentChanged.connect(self.treeViewSelectionChanged)
+        selectionModel.currentChanged.connect(self._treeViewSelectionChanged)
+
+        selectModulesButton = QPushButton()
+        selectModulesButton.setText('Select modules')
+        selectModulesButton.clicked.connect(self._selectModulesButtonClicked)
 
         leftLayout = QVBoxLayout()
         leftLayout.addWidget(self._searchEdit)
@@ -75,13 +82,14 @@ class MainWindow(QMainWindow):
         leftLayout.addWidget(includeInheritedCheckBox)
         leftLayout.addWidget(sortByTypeCheckBox)
         leftLayout.addWidget(self._treeView)
+        leftLayout.addWidget(selectModulesButton)
         leftLayout.setContentsMargins(0, 0, 0, 0)
         leftWidget = QWidget()
         leftWidget.setLayout(leftLayout)
 
         self._textBrowser = QTextBrowser()
         self._textBrowser.setOpenLinks(False)
-        self._textBrowser.anchorClicked.connect(self.linkClicked)
+        self._textBrowser.anchorClicked.connect(self._linkClicked)
 
         splitter = QSplitter()
         splitter.setHandleWidth(20)
@@ -99,39 +107,40 @@ class MainWindow(QMainWindow):
         # Show the window.
         self.show()
 
-    def searchEditTextChanged(self, text: str) -> None:
+    def _searchEditTextChanged(self, text: str) -> None:
         '''Filters the tree view to show just those items relevant to the search text.'''
         self._model.searchText = text
 
-    def matchCaseCheckBoxStateChanged(self, state: bool) -> None:
+    def _matchCaseCheckBoxStateChanged(self, state: bool) -> None:
         '''Determines whether matching is case-sensitive.'''
         self._model.matchCase = state
 
-    def includePrivateCheckBoxStateChanged(self, state: bool) -> None:
+    def _includePrivateCheckBoxStateChanged(self, state: bool) -> None:
         ''' Includes or excludes private members from the tree view.'''
         self._model.includePrivateMembers = state
 
-    def includeInheritedCheckBoxStateChanged(self, state: bool) -> None:
+    def _includeInheritedCheckBoxStateChanged(self, state: bool) -> None:
         ''' Includes or excludes inherited members from the tree view.'''
         self._model.includeInheritedMembers = state
 
-    def sortByTypeCheckBoxStateChanged(self, state: bool) -> None:
+    def _sortByTypeCheckBoxStateChanged(self, state: bool) -> None:
         ''' Includes or excludes private members from the tree view.'''
         self._model.sortByType = state
 
-    def treeViewSelectionChanged(self, index: QModelIndex, oldIndex: QModelIndex) -> None:
+    def _treeViewSelectionChanged(self, index: QModelIndex, oldIndex: QModelIndex) -> None:
         '''Determines which object was selected and displays appropriate info.'''
         item = self._model.getItemFromIndex(index)
         if item:
-            self.displayInfo(item)
+            self._displayInfo(item)
         else:
             self._textBrowser.clear()
 
-    def displayInfo(self, item: QStandardItem) -> None:
+    def _displayInfo(self, item: QStandardItem) -> None:
         '''Updates the detailed view to show information about the selected object.'''
         data = item.data()
         memberType = data['type']
         memberValue = data['value']
+        error = data['error']
 
         # Display the fully qualified name of the item.
         # TODO: Use __qualname__?
@@ -153,6 +162,10 @@ class MainWindow(QMainWindow):
         # Display object value.
         if memberType == 'object':
             html += f'<p><b>Value:</b> {escape(repr(memberValue))}'
+
+        # Display error message.
+        if len(error):
+            html += f'<p><b>Error:</b> {escape(error)}'
 
         # Display the filename for modules.
         # See if we can find the source file for other objects.
@@ -217,7 +230,7 @@ class MainWindow(QMainWindow):
     
         self._textBrowser.setHtml(html)
 
-    def linkClicked(self, url: QUrl) -> None:
+    def _linkClicked(self, url: QUrl) -> None:
         scheme = url.scheme()
         if scheme == 'file':
             # Open the file in an external application.
@@ -232,3 +245,13 @@ class MainWindow(QMainWindow):
             index = self._model.findItem(url.path())
             if index.isValid():
                 self._treeView.setCurrentIndex(index)
+
+    def _selectModulesButtonClicked(self) -> None:
+        self._moduleSelectionDialog = ModuleSelectionDialog(self, self._moduleNames)
+        self._moduleSelectionDialog.finished.connect(self._moduleSelectionDialogFinished)
+        self._moduleSelectionDialog.open()
+
+    def _moduleSelectionDialogFinished(self, result: int) -> None:
+        if result == ModuleSelectionDialog.Accepted:
+            self._moduleNames = self._moduleSelectionDialog.selectedModuleNames
+            self._model.setModuleNames(self._moduleNames)

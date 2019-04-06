@@ -1,11 +1,13 @@
+import importlib
 import inspect
-from PyQt5.QtCore import (QSortFilterProxyModel, QRegularExpression, QModelIndex)
-from PyQt5.QtGui import (QStandardItemModel, QStandardItem, QIcon)
+from PyQt5.QtCore import QSortFilterProxyModel, QRegularExpression, QModelIndex
+from PyQt5.QtGui import QStandardItemModel, QStandardItem, QIcon, QBrush, QColor
 
 class Model():
     '''Data model for pyspector.'''
 
     def __init__(self):
+        '''Initializes a Model instance.'''
         self._searchText = ''
         self._matchCase = False
         self._includePrivateMembers = False
@@ -108,7 +110,7 @@ class Model():
     @sortByType.setter
     def sortByType(self, value: bool) -> None:
         self._sortByType = value
-        self._resort()
+        self._sort()
 
     def getItemFromIndex(self, index: QModelIndex) -> QStandardItem:
         '''Returns the model item corresponding to the given index.'''
@@ -118,13 +120,22 @@ class Model():
         item = self._treeModel.itemFromIndex(unfilteredIndex)
         return item
 
-    def addModules(self, modules: list) -> None:
-        '''Adds all the members of the specified modules to the tree.'''
-        for module in modules:
-            self._addModule(module)
-        self._resort()
+    def setModuleNames(self, moduleNames) -> None:
+        '''Adds the specified modules to the tree, removing any that are no longer needed.'''
+        # Remove any modules that aren't in the list.
+        rootItem: QStandardItem = self._treeModel.invisibleRootItem()
+        for i in range(rootItem.rowCount() - 1, -1, -1):
+            if rootItem.child(i).text() not in moduleNames:
+                rootItem.removeRow(i)
 
-    def _resort(self) -> None:
+        # Add all the modules in the list.
+        for moduleName in moduleNames:
+            self._addModule(moduleName)
+
+        # Sort.
+        self._sort()
+
+    def _sort(self) -> None:
         # Sort all items alphabetically by name.
         self._treeModel.sort(0)
 
@@ -168,14 +179,18 @@ class Model():
                 return childIndex
         return QModelIndex()
 
-    def _addModule(self, module, depth = 0):
+    def _addModule(self, moduleName, depth = 0):
         # Check to see if module has already been added.
         rootItem = self._treeModel.invisibleRootItem()
-        if self._parentContainsItem(rootItem, module.__name__):
-            print(f'module {module.__name__} is already present')
+        if self._parentContainsItem(rootItem, moduleName):
             return
-        item = self._addItem(rootItem, module.__name__, module.__name__, 'module', module)
-        self._inspectObject(item, module, depth)
+
+        try:
+            module = importlib.import_module(moduleName)
+            item = self._addItem(rootItem, moduleName, moduleName, 'module', module)
+            self._inspectObject(item, module, depth)
+        except:
+            self._addItem(rootItem, moduleName, moduleName, 'module', None, error = 'Could not import module.')
 
     def _parentContainsItem(self, parentItem: QStandardItem, id: str) -> bool:
         for row in range(parentItem.rowCount()):
@@ -228,13 +243,14 @@ class Model():
                 if memberValue.fdel:
                     self._addItem(item, f'{id}/delete', '[delete]', 'function', memberValue.fdel)
 
-    def _addItem(self, parentItem: QStandardItem, id: str, name: str, type: str, value: object,
-                 inheritance: str = '') -> QStandardItem:
+    def _addItem(self, parentItem: QStandardItem, id: str, name: str, type: str, value: object, inheritance: str = '', error: str = '') -> QStandardItem:
         '''Adds one model item to a parent model item.'''
         key = type if type in self._icons else 'object'
         item1 = QStandardItem(self._icons[key], name)
-        item1.setData({ 'id': id, 'type': type, 'value': value })
+        item1.setData({ 'id': id, 'type': type, 'value': value, 'error': error })
         item1.setEditable(False)
+        if len(error):
+            item1.setBackground(QBrush(QColor(255, 0, 0, 64)))
         item2 = QStandardItem(type)
         item2.setEditable(False)
         item3 = QStandardItem(inheritance)
