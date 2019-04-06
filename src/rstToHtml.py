@@ -73,7 +73,7 @@ docutils.parsers.rst.directives.register_directive('deprecated', Deprecated)
 def rstToHtml(rstText, defaultRole = 'code'):
     '''Converts a reStructuredText documentation string to an HTML fragment.'''
     # Initialize settings.
-    templateFile = f'{dirname(__file__)}/templates/rstTohtml.txt'
+    templateFile = f'{dirname(dirname(__file__))}/templates/rstTohtml.txt'
     settings = {
         'template': templateFile,              # Use a template that discards all but the body.
         'output_encoding': 'unicode',          # Provide output as an unencoded Unicode string.

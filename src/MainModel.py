@@ -1,5 +1,6 @@
 import importlib
 import inspect
+from os.path import dirname
 from PyQt5.QtCore import QSortFilterProxyModel, QRegularExpression, QModelIndex
 from PyQt5.QtGui import QStandardItemModel, QStandardItem, QIcon, QBrush, QColor
 
@@ -15,13 +16,14 @@ class MainModel():
         self._sortByType = True
 
         # Initialize icons.
+        iconDir = f'{dirname(dirname(__file__))}/icons'
         self._icons = {
-            'module': QIcon('icons/module.svg'),
-            'abstract base class': QIcon('icons/abstract.svg'),
-            'class': QIcon('icons/class.svg'),
-            'function': QIcon('icons/function.svg'),
-            'property': QIcon('icons/property.svg'),
-            'object': QIcon('icons/object.svg')
+            'module': QIcon(f'{iconDir}/module.svg'),
+            'abstract base class': QIcon(f'{iconDir}/abstract.svg'),
+            'class': QIcon(f'{iconDir}/class.svg'),
+            'function': QIcon(f'{iconDir}/function.svg'),
+            'property': QIcon(f'{iconDir}/property.svg'),
+            'object': QIcon(f'{iconDir}/object.svg')
         }
 
         # Create the unfiltered tree model.
