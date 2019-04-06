@@ -1,9 +1,12 @@
+# External imports:
 import pkgutil
 import sys
 
 class ModuleData:
     '''Provides the name and location of a module, as well as a list of submodules.'''
+
     def __init__(self, name, location):
+        '''Initializes a ModuleData instance.'''
         self.name = name
         self.location = location
         self.children = []
@@ -14,7 +17,9 @@ class ModuleSelectionModel:
 
     Includes built-in modules as well as modules available to import from the system path.
     '''
+
     def __init__(self):
+        '''Initializes a ModuleSelectionModel instance.'''
         # Create root node.
         self._rootModuleData = ModuleData('root', None)
 

@@ -1,3 +1,4 @@
+# External imports:
 import docutils.core
 import docutils.nodes
 import docutils.parsers.rst
@@ -33,7 +34,7 @@ for role in ['mod', 'func', 'data', 'const', 'class', 'meth', 'attr', 'exc', 'ob
     docutils.parsers.rst.roles.register_local_role('py:' + role, customRoleHandler)
 
 class HeaderedDirective(docutils.parsers.rst.Directive):
-    '''Handles directives that need a custom header before their content.'''
+    '''Base class for handling directives that need a custom header before their content.'''
     has_content = True
     header = ''
 

@@ -1,13 +1,19 @@
+# External imports:
 from PyQt5.QtCore import Qt, QSortFilterProxyModel
 from PyQt5.QtGui import QStandardItem, QStandardItemModel
-from PyQt5.QtWidgets import QDialog, QDialogButtonBox, QLabel, QLineEdit, QTreeView, QVBoxLayout
+from PyQt5.QtWidgets import QDialog, QDialogButtonBox, QLabel, QLineEdit, QVBoxLayout
+
+# Local imports:
 from ModuleSelectionModel import ModuleSelectionModel
+from TreeView import TreeView
 
 class ModuleSelectionDialog(QDialog):
+    '''A dialog for choosing which modules to inspect.'''
 
     _moduleSelectionModel = None
 
     def __init__(self, parent, selectedModuleNames):
+        '''Initializes a ModuleSelectionModel instance.'''
         super().__init__(parent)
         self.setWindowModality(Qt.ApplicationModal)
 
@@ -22,9 +28,8 @@ class ModuleSelectionDialog(QDialog):
         self._searchEdit.setPlaceholderText('Search')
         self._searchEdit.textChanged.connect(self._searchEditTextChanged)
 
-        self._treeView: QTreeView = QTreeView()
+        self._treeView = TreeView()
         self._treeView.setModel(self._sortFilterProxyModel)
-        self._treeView.setSelectionMode(QTreeView.NoSelection)
         self._treeView.setSortingEnabled(True)
         self._treeView.sortByColumn(0, Qt.AscendingOrder)
         self._treeView.setColumnWidth(0, 200)
@@ -46,9 +51,11 @@ class ModuleSelectionDialog(QDialog):
 
     @property
     def selectedModuleNames(self):
+        '''The list of selected module names.'''
         return self._selectedModuleNames
 
     def _createModel(self):
+        '''Creates the hierarchical model of items to display.'''
         # Create a cached hierarchy of all available modules, if we haven't already.
         # TODO: This time-consuming operation blocks the UI. Can we do it in the background,
         # or at least show a spinner while the work is being done?
@@ -68,6 +75,7 @@ class ModuleSelectionDialog(QDialog):
         self._sortFilterProxyModel.setRecursiveFilteringEnabled(True)
 
     def _createItems(self, parentItem: QStandardItem, moduleDataList: list) -> None:
+        '''Creates the items associsted with a list of module data, and recurses.'''
         for moduleData in moduleDataList:
             item1 = QStandardItem(moduleData.name)
             item1.setCheckable(True)
@@ -84,13 +92,14 @@ class ModuleSelectionDialog(QDialog):
         self._sortFilterProxyModel.setFilterFixedString(text)
 
     def _acceptButtonPressed(self) -> None:
-        # TODO: recurse into child items.
+        '''Gathers a list of selected module names and closes the dialog.'''
         selectedModuleNames = []
         self._listSelectedModules(self._model.invisibleRootItem(), selectedModuleNames)
         self._selectedModuleNames = selectedModuleNames
         self.accept()
 
     def _listSelectedModules(self, parentItem: QStandardItem, selectedModuleNames: list) -> None:
+        '''Recursively gathers a list of selected module names.'''
         for i in range(parentItem.rowCount()):
             item = parentItem.child(i)
             if item.checkState() == Qt.Checked:

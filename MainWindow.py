@@ -1,3 +1,4 @@
+# External imports:
 import inspect
 from html import escape
 from markdown import markdown
@@ -6,6 +7,9 @@ from PyQt5.QtGui import (QStandardItemModel, QStandardItem)
 from PyQt5.QtWidgets import (QApplication, QLineEdit, QWidget, QHBoxLayout, QVBoxLayout,
     QTextBrowser, QSplitter, QMainWindow, QAction, QCheckBox, QPushButton)
 import webbrowser
+
+# Local imports:
+from Config import Config
 from ModuleSelectionDialog import ModuleSelectionDialog
 from Model import Model
 from TreeView import TreeView
@@ -13,8 +17,6 @@ from utilities import openFile
 from rstToHtml import rstToHtml
 
 # TODO
-# - Always include built-in modules
-# - Provide a way to add and remove other modules
 # - Offer to open modules when user clicks on a link to an as-yet unloaded object.
 # - Resolve links that are relative to the current module or parent module (e.g., in docutils.writers.get_writer_class).
 # - Remember the user's navigation history and provide back/forward navigation buttons.
@@ -22,14 +24,22 @@ from rstToHtml import rstToHtml
 # - Allow a selected module to be removed using a context menu command or the Delete or Backspace key. 
 
 class MainWindow(QMainWindow):
-    def __init__(self, config: dict):
-        '''Constructs a new MainWindow.'''
+    '''The main window of the application.'''
+
+    def __init__(self, config: Config):
+        '''Initializes a MainWindow instance.'''
         super().__init__()
 
+        # Store configuration.
+        self._config = config
+
         # Create model.
-        self._moduleNames = config['moduleNames']
         self._model = Model()
-        self._model.setModuleNames(self._moduleNames)
+        self._model.matchCase = config.matchCase
+        self._model.includePrivateMembers = config.includePrivateMembers
+        self._model.includeInheritedMembers = config.includeInheritedMembers
+        self._model.sortByType = config.sortByType
+        self._model.setModuleNames(config.moduleNames)
 
         # Configure window.
         self.setWindowTitle('pyspector')
@@ -111,21 +121,29 @@ class MainWindow(QMainWindow):
         '''Filters the tree view to show just those items relevant to the search text.'''
         self._model.searchText = text
 
-    def _matchCaseCheckBoxStateChanged(self, state: bool) -> None:
+    def _matchCaseCheckBoxStateChanged(self, state: Qt.CheckState) -> None:
         '''Determines whether matching is case-sensitive.'''
-        self._model.matchCase = state
+        isChecked = state == Qt.Checked
+        self._config.matchCase = isChecked
+        self._model.matchCase = isChecked
 
-    def _includePrivateCheckBoxStateChanged(self, state: bool) -> None:
+    def _includePrivateCheckBoxStateChanged(self, state: Qt.CheckState) -> None:
         ''' Includes or excludes private members from the tree view.'''
-        self._model.includePrivateMembers = state
+        isChecked = state == Qt.Checked
+        self._config.includePrivateMembers = isChecked
+        self._model.includePrivateMembers = isChecked
 
-    def _includeInheritedCheckBoxStateChanged(self, state: bool) -> None:
+    def _includeInheritedCheckBoxStateChanged(self, state: Qt.CheckState) -> None:
         ''' Includes or excludes inherited members from the tree view.'''
-        self._model.includeInheritedMembers = state
+        isChecked = state == Qt.Checked
+        self._config.includeInheritedMembers = isChecked
+        self._model.includeInheritedMembers = isChecked
 
-    def _sortByTypeCheckBoxStateChanged(self, state: bool) -> None:
+    def _sortByTypeCheckBoxStateChanged(self, state: Qt.CheckState) -> None:
         ''' Includes or excludes private members from the tree view.'''
-        self._model.sortByType = state
+        isChecked = state == Qt.Checked
+        self._config.sortByType = isChecked
+        self._model.sortByType = isChecked
 
     def _treeViewSelectionChanged(self, index: QModelIndex, oldIndex: QModelIndex) -> None:
         '''Determines which object was selected and displays appropriate info.'''
@@ -247,11 +265,12 @@ class MainWindow(QMainWindow):
                 self._treeView.setCurrentIndex(index)
 
     def _selectModulesButtonClicked(self) -> None:
-        self._moduleSelectionDialog = ModuleSelectionDialog(self, self._moduleNames)
+        self._moduleSelectionDialog = ModuleSelectionDialog(self, self._config.moduleNames)
         self._moduleSelectionDialog.finished.connect(self._moduleSelectionDialogFinished)
         self._moduleSelectionDialog.open()
 
     def _moduleSelectionDialogFinished(self, result: int) -> None:
         if result == ModuleSelectionDialog.Accepted:
-            self._moduleNames = self._moduleSelectionDialog.selectedModuleNames
-            self._model.setModuleNames(self._moduleNames)
+            moduleNames = self._moduleSelectionDialog.selectedModuleNames
+            self._model.setModuleNames(moduleNames)
+            self._config.moduleNames = moduleNames
