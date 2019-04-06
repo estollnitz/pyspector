@@ -11,7 +11,7 @@ import webbrowser
 # Local imports:
 from Config import Config
 from ModuleSelectionDialog import ModuleSelectionDialog
-from Model import Model
+from MainModel import MainModel
 from TreeView import TreeView
 from utilities import openFile
 from rstToHtml import rstToHtml
@@ -34,7 +34,7 @@ class MainWindow(QMainWindow):
         self._config = config
 
         # Create model.
-        self._model = Model()
+        self._model = MainModel()
         self._model.matchCase = config.matchCase
         self._model.includePrivateMembers = config.includePrivateMembers
         self._model.includeInheritedMembers = config.includeInheritedMembers

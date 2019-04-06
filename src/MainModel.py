@@ -3,11 +3,11 @@ import inspect
 from PyQt5.QtCore import QSortFilterProxyModel, QRegularExpression, QModelIndex
 from PyQt5.QtGui import QStandardItemModel, QStandardItem, QIcon, QBrush, QColor
 
-class Model():
+class MainModel():
     '''Data model for pyspector.'''
 
     def __init__(self):
-        '''Initializes a Model instance.'''
+        '''Initializes a MainModel instance.'''
         self._searchText = ''
         self._matchCase = False
         self._includePrivateMembers = False

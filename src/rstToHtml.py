@@ -73,7 +73,7 @@ def rstToHtml(rstText, defaultRole = 'code'):
     '''Converts a reStructuredText documentation string to an HTML fragment.'''
     # Initialize settings.
     settings = {
-        'template': 'rstToHtmlTemplate.txt',   # Use a template that discards all but the body.
+        'template': 'templates/rstToHtml.txt', # Use a template that discards all but the body.
         'output_encoding': 'unicode',          # Provide output as an unencoded Unicode string.
         'report_level': 3,                     # Ignore info (1) and warning (2) messages.
         'halt_level': 3,                       # Stop for error (3) or severe (4) messages.
