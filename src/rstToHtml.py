@@ -4,6 +4,7 @@ import docutils.nodes
 import docutils.parsers.rst
 import docutils.utils
 import re
+from os.path import dirname
 
 def customRoleHandler(name, rawText, text, lineNo, inliner, options = {}, content = []):
     '''Inserts a reference node when interpreted text with a custom role is encountered.'''
@@ -72,8 +73,9 @@ docutils.parsers.rst.directives.register_directive('deprecated', Deprecated)
 def rstToHtml(rstText, defaultRole = 'code'):
     '''Converts a reStructuredText documentation string to an HTML fragment.'''
     # Initialize settings.
+    templateFile = f'{dirname(__file__)}/templates/rstTohtml.txt'
     settings = {
-        'template': 'templates/rstToHtml.txt', # Use a template that discards all but the body.
+        'template': templateFile,              # Use a template that discards all but the body.
         'output_encoding': 'unicode',          # Provide output as an unencoded Unicode string.
         'report_level': 3,                     # Ignore info (1) and warning (2) messages.
         'halt_level': 3,                       # Stop for error (3) or severe (4) messages.
