@@ -51,4 +51,4 @@ When you select an item in the tree view, `pyspector` displays detailed informat
 
 ## Development
 
-You're welcome to contribute to the development of `pyspector`. Feel free to address any of the existing [issues](issues) or open new issues. Please submit a pull request from a fork of the code if you've developed a fix or an improvement.
+You're welcome to contribute to the development of `pyspector`. Feel free to address any of the existing [issues](../../issues) or open new issues. Please submit a pull request from a fork of the code if you've developed a fix or an improvement.
