@@ -1,20 +1,23 @@
 # External imports:
 import inspect
+import platform
 from html import escape
 from markdown import markdown
 from PyQt5.QtCore import (Qt, QSortFilterProxyModel, QRegularExpression, QUrl, QModelIndex)
-from PyQt5.QtGui import (QStandardItemModel, QStandardItem)
+from PyQt5.QtGui import (QStandardItemModel, QStandardItem, QFont, QColor, QTextCursor, QTextFormat)
 from PyQt5.QtWidgets import (QApplication, QLineEdit, QWidget, QHBoxLayout, QVBoxLayout,
-    QTextBrowser, QSplitter, QMainWindow, QAction, QCheckBox, QPushButton)
+    QTextBrowser, QSplitter, QMainWindow, QAction, QCheckBox, QPushButton, QPlainTextEdit,
+    QTextEdit)
 import webbrowser
 
 # Local imports:
 from Config import Config
-from ModuleSelectionDialog import ModuleSelectionDialog
 from MainModel import MainModel
+from ModuleSelectionDialog import ModuleSelectionDialog
+from PythonSyntaxHighlighter import PythonSyntaxHighlighter
+from rstToHtml import rstToHtml
 from TreeView import TreeView
 from utilities import openFile
-from rstToHtml import rstToHtml
 
 # TODO
 # - Offer to open modules when user clicks on a link to an as-yet unloaded object.
@@ -101,11 +104,28 @@ class MainWindow(QMainWindow):
         self._textBrowser.setOpenLinks(False)
         self._textBrowser.anchorClicked.connect(self._linkClicked)
 
+        print(f'font substitutions: {QFont.substitutions()}')
+        fontFamily = 'Menlo' if platform.system() == 'Darwin' else 'Consolas'
+        fixedPitchFont = QFont(fontFamily)
+        fixedPitchFont.setFixedPitch(True)
+        self._sourceTextViewer = QPlainTextEdit()
+        self._sourceTextViewer.setReadOnly(True)
+        self._sourceTextViewer.setFont(fixedPitchFont)
+        self._sourceTextViewer.setLineWrapMode(QPlainTextEdit.NoWrap)
+        self._sourceTextHighlighter = PythonSyntaxHighlighter(self._sourceTextViewer.document())
+
+        rightSplitter = QSplitter()
+        rightSplitter.setOrientation(Qt.Vertical)
+        rightSplitter.setHandleWidth(20)
+        rightSplitter.setChildrenCollapsible(False)
+        rightSplitter.addWidget(self._textBrowser)
+        rightSplitter.addWidget(self._sourceTextViewer)
+
         splitter = QSplitter()
         splitter.setHandleWidth(20)
         splitter.setChildrenCollapsible(False)
         splitter.addWidget(leftWidget)
-        splitter.addWidget(self._textBrowser)
+        splitter.addWidget(rightSplitter)
         splitter.setSizes([300, 900])
 
         centralLayout = QHBoxLayout()
@@ -189,13 +209,26 @@ class MainWindow(QMainWindow):
         # See if we can find the source file for other objects.
         if memberType == 'module' and hasattr(memberValue, '__file__'):
             html += f'<p><b>File:</b> <a href="file:{memberValue.__file__}">{memberValue.__file__}</a></p>'
+            self._displaySource(memberValue.__file__)
         else:
             try:
-                sourceFile = inspect.getsourcefile(memberValue)
+                # Substitute the getter, setter, or deleter for a property instance.
+                # TODO: Generalize this to data descriptors other than just the 'property' class.
+                if isinstance(memberValue, property):
+                    if memberValue.fget:
+                        memberValue = memberValue.fget
+                    elif memberValue.fset:
+                        memberValue = memberValue.fset
+                    elif memberValue.fdel:
+                        memberValue = memberValue.fdel
+
+                # Note that inspect.getsourcelines calls unwrap, while getsourcefile does not.
+                sourceFile = inspect.getsourcefile(inspect.unwrap(memberValue))
                 lines = inspect.getsourcelines(memberValue)
                 html += f'<p><b>File:</b> <a href="file:{sourceFile}">{sourceFile} ({lines[1]})</a></p>'
+                self._displaySource(sourceFile, lines[1], len(lines[0]))
             except:
-                pass
+                self._displaySourceError('Could not locate source code.')
 
         # Display the inheritance hierarchy of classes.
         if 'class' in memberType:
@@ -247,6 +280,42 @@ class MainWindow(QMainWindow):
                 html += f'<hr>{docHtml}'
     
         self._textBrowser.setHtml(html)
+
+    def _displaySource(self, filename: str, startLine: int = None, lineCount: int = None) -> None:
+        '''Shows source code within the source text viewer.'''
+        try:
+            # Read the file and populate the source text viewer.
+            with open(filename) as fp:
+                lines = fp.readlines()
+                self._sourceTextViewer.setPlainText(''.join(lines))
+
+            # Restart the Python syntax highlighter.
+            self._sourceTextHighlighter.setDocument(self._sourceTextViewer.document())
+
+            # If line numbers are available, highlight the lines encompassing the currently
+            # selected member.
+            if startLine != None:
+                cursor = QTextCursor(self._sourceTextViewer.document())
+                cursor.movePosition(QTextCursor.Start)
+                if startLine > 1:
+                    cursor.movePosition(QTextCursor.NextBlock, QTextCursor.MoveAnchor, startLine - 1)
+                self._sourceTextViewer.setTextCursor(cursor)
+                cursor.movePosition(QTextCursor.NextBlock, QTextCursor.KeepAnchor, lineCount)
+                lineColor = QColor(255, 255, 0, 48)
+                extraSelection = QTextEdit.ExtraSelection()
+                extraSelection.format.setBackground(lineColor)
+                extraSelection.format.setProperty(QTextFormat.FullWidthSelection, True)
+                extraSelection.cursor = cursor
+                self._sourceTextViewer.setExtraSelections([extraSelection])
+                self._sourceTextViewer.centerCursor()
+        except:
+            self._displaySourceError('Could not open file.')
+
+    def _displaySourceError(self, errorMessage: str) -> None:
+        '''Displays an error message within the source text viewer.'''
+        self._sourceTextViewer.setPlainText(errorMessage)
+        self._sourceTextViewer.setExtraSelections([])
+        self._sourceTextHighlighter.setDocument(None)
 
     def _linkClicked(self, url: QUrl) -> None:
         scheme = url.scheme()
