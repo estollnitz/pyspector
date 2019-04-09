@@ -104,7 +104,6 @@ class MainWindow(QMainWindow):
         self._textBrowser.setOpenLinks(False)
         self._textBrowser.anchorClicked.connect(self._linkClicked)
 
-        print(f'font substitutions: {QFont.substitutions()}')
         fontFamily = 'Menlo' if platform.system() == 'Darwin' else 'Consolas'
         fixedPitchFont = QFont(fontFamily)
         fixedPitchFont.setFixedPitch(True)
