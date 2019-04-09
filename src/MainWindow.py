@@ -19,13 +19,6 @@ from rstToHtml import rstToHtml
 from TreeView import TreeView
 from utilities import openFile
 
-# TODO
-# - Offer to open modules when user clicks on a link to an as-yet unloaded object.
-# - Resolve links that are relative to the current module or parent module (e.g., in docutils.writers.get_writer_class).
-# - Remember the user's navigation history and provide back/forward navigation buttons.
-# - Within classes, distinguish between instance methods, class methods, and static methods.
-# - Allow a selected module to be removed using a context menu command or the Delete or Backspace key. 
-
 class MainWindow(QMainWindow):
     '''The main window of the application.'''
 
