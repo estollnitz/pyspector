@@ -25,11 +25,11 @@ pip3 install PyQt5
 You can run `pyspector` from the command line as follows:
 
 ```sh
-python3 src/__init__.py
+python3 src/main.py
 ```
 
 If you've got [Visual Studio Code](https://code.visualstudio.com/) and the
-[Python extension for VS Code](https://marketplace.visualstudio.com/items?itemName=ms-python.python), you can run **pyspector** by opening the containing folder and launching using the "Python: Module" launch configuration.
+[Python extension for VS Code](https://marketplace.visualstudio.com/items?itemName=ms-python.python), you can run `pyspector` by opening the containing folder and launching using the "Python: Module" launch configuration.
 
 Once the application is running, you can choose which modules to inspect by pressing the "Select modules" button in the bottom-left corner. Be patient, as it may take a little while to discover all the modules in your python installation. Check each of the modules you want to inspect, then press "OK."
 
