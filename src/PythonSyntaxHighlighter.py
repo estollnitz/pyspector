@@ -1,8 +1,6 @@
 '''
 Color syntax highlighting for the Python language.
 
-This is a test of escapes.\nDid highlighting work \u301a? # fake comment here
-
 Loosely based on https://wiki.python.org/moin/PyQt/Python%20syntax%20highlighting.
 '''
 
@@ -15,8 +13,9 @@ from PyQt5.QtGui import QBrush, QColor, QTextCharFormat, QFont, QSyntaxHighlight
 
 # TODO: Fix highlighting of the following line so that the first hash character is not
 # treated as the start of a comment.
-TODO_FIX_COMMENT_HIGHLIGHTING = 'def foo(bar): return "baz" # comment within string' # \n comment
-# Also, don't color strings like 'this' and "that" and escape sequences like \n and \r within comments.
+'Bug: color should not change after # within a string' # but should change in comment.
+
+# TODO: don't color escape sequences like \n and \r within comments.
 
 def format(colorName: str, style: str = '') -> QTextCharFormat:
     '''Return a QTextCharFormat with the given attributes.'''
@@ -30,17 +29,18 @@ def format(colorName: str, style: str = '') -> QTextCharFormat:
 
 # Styles for various parts of the language:
 STYLES = {
+    'brace': format('black'),
+    'comment': format('green', 'italic'),
+    'decorator': format('steelBlue'),
+    'definition': format('black', 'bold'),
+    'escapeSequence': format('chocolate'),
     'keyword': format('blue'),
     'operator': format('indigo'),
-    'brace': format('black'),
-    'definition': format('black', 'bold'),
     'string': format('darkRed'),
     'multilineString': format('darkRed'),
-    'comment': format('green', 'italic'),
-    'self': format('purple', 'italic'),
     'number': format('darkGreen'),
-    'escapeSequence': format('chocolate'),
-    'decorator': format('steelBlue'),
+    'self': format('purple', 'italic'),
+    'todo': format('red', 'italic'),
 }
 
 class PythonSyntaxHighlighter(QSyntaxHighlighter):
@@ -120,6 +120,9 @@ class PythonSyntaxHighlighter(QSyntaxHighlighter):
 
             # Comment (from '#' until the end of the line):
             (r'#[^\n]*', 0, 'comment'),
+
+            # A to-do, bug, or fix-me item at the start of a comment:
+            (r'#[ \t]*(TODO|BUG|FIXME)', 1, 'todo'),
         ]
 
         # Store a regular expression in the rule for each pattern.
