@@ -77,31 +77,46 @@ class PythonSyntaxHighlighter(QSyntaxHighlighter):
         # Byte literals must be prefixed by 'b' (for bytes) and optionally by 'r' (for raw).
         stringPrefixes = 'r|u|R|U|f|F|fr|Fr|fR|FR|rf|rF|Rf|RF'
         bytePrefixes = 'b|B|br|Br|bR|BR|rb|rB|Rb|RB'
-        stringOrBytePrefixes = f'({stringPrefixes}|{bytePrefixes})?'
+        stringOrBytePrefixes = f'(?:{stringPrefixes}|{bytePrefixes})?'
 
         # Multiline strings begin and end with three single- or double-quotes.
-        # The comments that end the following two lines help our highlighter work on this file.
-        self._threeSingleQuotes = (QRegularExpression("'''"), 1, 'multilineString') # '''
-        self._threeDoubleQuotes = (QRegularExpression('"""'), 2, 'multilineString') # """
-
-        rules = []
+        singleQuote = "'"
+        doubleQuote = '"'
+        threeSingleQuotes = singleQuote * 3
+        threeDoubleQuotes = doubleQuote * 3
+        threeQuotes = f'(?:({threeSingleQuotes})|({threeDoubleQuotes}))'
+        self._threeSingleQuotes = QRegularExpression(threeSingleQuotes)
+        self._threeDoubleQuotes = QRegularExpression(threeDoubleQuotes)
+        self._multilineStringStart = QRegularExpression(f'{stringOrBytePrefixes}{threeQuotes}')
 
         # Add keyword, operator, and brace rules.
-        rules += [(rf'\b{word}\b', 0, 'keyword')
+        rules = [(rf'\b{word}\b', 0, 'keyword')
             for word in keyword.kwlist]
         rules += [(re.escape(operator), 0, 'operator')
             for operator in PythonSyntaxHighlighter._operators]
         rules += [(re.escape(brace), 0, 'brace')
             for brace in PythonSyntaxHighlighter._braces]
 
+        # Set up parts of a floating point number. Because it may start or end with a decimal
+        # point, a float doesn't necessarily start or end at a '\b' boundary.
+        digitPart = '(?:[0-9][0-9_]*)'
+        fraction = rf'(?:\.{digitPart})'
+        exponent = f'(?:[eE][+-]?{digitPart})'
+        digitsWithFraction = f'(?:{digitPart}?{fraction})'
+        digitsWithDot = rf'(?:{digitPart}\.)'
+        pointFloat = f'(?:{digitsWithFraction}|{digitsWithDot})'
+        exponentFloat = f'(?:{digitPart}|{pointFloat}){exponent}'
+        floatNumber = f'(?:{exponentFloat}|{pointFloat})'
+
         # Add other rules.
         rules += [
             # Numeric literals:
-            (r'\b[1-9][0-9_]*\b', 0, 'number'),        # decimal
             (r'\b0[bB][0-1_]+\b', 0, 'number'),        # binary
             (r'\b0[oO][0-7_]+\b', 0, 'number'),        # octal
+            (r'\b[1-9][0-9_]*\b', 0, 'number'),        # decimal
             (r'\b0[xX][0-9A-Fa-f_]+\b', 0, 'number'),  # hexadecimal
-            (r'\b[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?\b', 0, 'number'),
+            (floatNumber, 0, 'number'),                # float
+            (rf'{floatNumber}[jJ]\b', 0, 'number'),    # imaginary
 
             # Decorator ('@' followed by an identifier):
             (r'@[\w.]+\b', 0, 'decorator'),
@@ -109,8 +124,8 @@ class PythonSyntaxHighlighter(QSyntaxHighlighter):
             # Class or function definition ('class' or 'def' followed by an identifier):
             (r'\b(class|def)\b\s*(\w+)', 2, 'definition'),
 
-            # The 'self' variable (not a keyword, but a common convention):
-            (r'\bself\b', 0, 'self'),
+            # The 'self' or 'cls' variable (not a keyword, but a common convention):
+            (r'\b(self|cls)\b', 0, 'self'),
 
             # Double-quoted string, possibly containing escape sequences:
             (stringOrBytePrefixes + r'"[^"\\]*(\\.[^"\\]*)*"', 0, 'string'),
@@ -121,8 +136,8 @@ class PythonSyntaxHighlighter(QSyntaxHighlighter):
             # Comment (from '#' until the end of the line):
             (r'#[^\n]*', 0, 'comment'),
 
-            # A to-do, bug, or fix-me item at the start of a comment:
-            (r'#[ \t]*(TODO|BUG|FIXME)', 1, 'todo'),
+            # Common labels used at the start of a comment:
+            (r'#[ \t]*(TODO|BUG|FIXME|HACK|NOTE|XXX)', 1, 'todo'),
         ]
 
         # Store a regular expression in the rule for each pattern.
@@ -149,9 +164,7 @@ class PythonSyntaxHighlighter(QSyntaxHighlighter):
 
         # Check for multiline strings.
         self.setCurrentBlockState(0)
-        inMultilineQuote = self._matchMultiline(text, *self._threeSingleQuotes)
-        if not inMultilineQuote:
-            inMultilineQuote = self._matchMultiline(text, *self._threeDoubleQuotes)
+        self._highlightMultilineStrings(text)
 
         # Apply our separate rules for escape sequences.
         self._applyRules(text, self._escapeRules)
@@ -166,45 +179,43 @@ class PythonSyntaxHighlighter(QSyntaxHighlighter):
                 length = match.capturedLength(nth)
                 self.setFormat(start, length, STYLES[style])
 
-    def _matchMultiline(self, text: str, delimiter: QRegularExpression, inState: int, style: str) -> bool:
-        '''Highlights multiline strings.
-        
-        `delimiter` is a regular expression for three single- or double-quotes, and `inState` is a
-        unique integer representing the corresponding state changes when inside those strings.
-        Returns `True` if we're still inside a multiline string when this function finishes.
-        '''
-        # If we're already inside a triple-quoted string, start at position 0.
-        if self.previousBlockState() == inState:
+    def _highlightMultilineStrings(self, text: str) -> None:
+        '''Highlights multiline strings.'''
+        # If we're already inside a triple-quoted string, look for the ending triple-quote.
+        state = self.previousBlockState()
+        if state > 0:
             start = 0
-            add = 0
-        # Otherwise, look for the delimiter on this line.
-        else:
-            match = delimiter.match(text)
-            start = match.capturedStart()
-            # Move past this match.
-            add = match.capturedLength()
-
-        # As long as there's a delimiter match on this line...
-        while start >= 0:
-            # Look for the ending delimiter.
-            # It the ending delimiter on this line?
-            match = delimiter.match(text, start + add)
-            end = match.capturedStart()
-            if end >= add:
-                # Yes. Turn off the block state.
-                length = end - start + add + match.capturedLength()
+            end = 0
+            regexp = self._threeSingleQuotes if state == 1 else self._threeDoubleQuotes
+            match = regexp.match(text, end)
+            if match.hasMatch():
+                length = match.capturedEnd() - start
                 self.setCurrentBlockState(0)
             else:
-                # No. We're inside a multiline string, so set the block state.
-                self.setCurrentBlockState(inState)
-                length = len(text) - start + add
+                length = len(text) - start
+                self.setCurrentBlockState(state)
+            self.setFormat(start, length, STYLES['multilineString'])
+        else:
+            start = 0
+            length = 0
 
-            # Apply formatting to `length` characters beginning at index `start`.
-            self.setFormat(start, length, STYLES[style])
+        # As long as there's a delimiter match on this line...
+        match = self._multilineStringStart.match(text, start + length)
+        while match.hasMatch():
+            state = 1 if match.capturedLength(1) else 2
+            start = match.capturedStart()
+            end = match.capturedEnd()
+
+            # Look for the ending delimiter.
+            regexp = self._threeSingleQuotes if state == 1 else self._threeDoubleQuotes
+            match = regexp.match(text, end)
+            if match.hasMatch():
+                length = match.capturedEnd() - start
+                self.setCurrentBlockState(0)
+            else:
+                length = len(text) - start
+                self.setCurrentBlockState(state)
+            self.setFormat(start, length, STYLES['multilineString'])
 
             # Look for the next match.
-            match = delimiter.match(text, start + length)
-            start = match.capturedStart()
-
-        # Return True if we're still inside a multiline string.
-        return self.currentBlockState() == inState
+            match = self._multilineStringStart.match(text, start + length)
