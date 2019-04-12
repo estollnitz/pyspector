@@ -1,21 +1,12 @@
 '''
 Color syntax highlighting for the Python language.
-
-Loosely based on https://wiki.python.org/moin/PyQt/Python%20syntax%20highlighting.
 '''
 
 # External imports:
 import re
 import sys
 import keyword
-from PyQt5.QtCore import QRegularExpression, QRegularExpressionMatch, QRegularExpressionMatchIterator
-from PyQt5.QtGui import QBrush, QColor, QTextCharFormat, QFont, QSyntaxHighlighter
-
-# TODO: Fix highlighting of the following line so that the first hash character is not
-# treated as the start of a comment.
-'Bug: color should not change after # within a string' # but should change in comment.
-
-# TODO: don't color escape sequences like \n and \r within comments.
+from PyQt5.QtGui import QBrush, QColor, QFont, QSyntaxHighlighter, QTextCharFormat
 
 def format(colorName: str, style: str = '') -> QTextCharFormat:
     '''Return a QTextCharFormat with the given attributes.'''
@@ -29,18 +20,27 @@ def format(colorName: str, style: str = '') -> QTextCharFormat:
 
 # Styles for various parts of the language:
 STYLES = {
-    'brace': format('black'),
+    # A comment may contain todo items.
     'comment': format('green', 'italic'),
-    'decorator': format('steelBlue'),
-    'definition': format('black', 'bold'),
+    'todo': format('red', 'italic'),
+
+    # A string may contain escape sequences; a formatted string may contain formatted replacements.
+    'string': format('darkRed'),
+    'rawString': format('firebrick'),
     'escapeSequence': format('chocolate'),
+    'formattedReplacement': format('steelBlue'),
+
+    # A definition contains an identifier.
+    'definition': format('blue'),
+    'identifier': format('black', 'bold'),
+
+    # Additional parts of the language:
+    'brace': format('darkSlateGray'),
+    'decorator': format('steelBlue'),
     'keyword': format('blue'),
     'operator': format('indigo'),
-    'string': format('darkRed'),
-    'multilineString': format('darkRed'),
     'number': format('darkGreen'),
     'self': format('purple', 'italic'),
-    'todo': format('red', 'italic'),
 }
 
 class PythonSyntaxHighlighter(QSyntaxHighlighter):
@@ -73,149 +73,192 @@ class PythonSyntaxHighlighter(QSyntaxHighlighter):
         '''Initializes a PythonSyntaxHighlighter instance.'''
         super().__init__(document)
 
-        # String literals can be prefixed by 'r' (for raw) or 'f' (for formatted).
-        # Byte literals must be prefixed by 'b' (for bytes) and optionally by 'r' (for raw).
-        stringPrefixes = 'r|u|R|U|f|F|fr|Fr|fR|FR|rf|rF|Rf|RF'
-        bytePrefixes = 'b|B|br|Br|bR|BR|rb|rB|Rb|RB'
-        stringOrBytePrefixes = f'(?:{stringPrefixes}|{bytePrefixes})?'
+        # Create a pattern that matches a comment (from '#' until the end of the line), and a
+        # subpattern for common labels used within comments.
+        comment = self._makeNamedGroup('comment', rf'#.*')
+        todoLabels = ['TODO', 'BUG', 'FIXME', 'HACK', 'NOTE', 'XXX']
+        todo = self._makeNamedAlternatives('todo', [rf'\b{label}\b' for label in todoLabels])
 
-        # Multiline strings begin and end with three single- or double-quotes.
-        singleQuote = "'"
-        doubleQuote = '"'
-        threeSingleQuotes = singleQuote * 3
-        threeDoubleQuotes = doubleQuote * 3
-        threeQuotes = f'(?:({threeSingleQuotes})|({threeDoubleQuotes}))'
-        self._threeSingleQuotes = QRegularExpression(threeSingleQuotes)
-        self._threeDoubleQuotes = QRegularExpression(threeDoubleQuotes)
-        self._multilineStringStart = QRegularExpression(f'{stringOrBytePrefixes}{threeQuotes}')
-
-        # Add keyword, operator, and brace rules.
-        rules = [(rf'\b{word}\b', 0, 'keyword')
-            for word in keyword.kwlist]
-        rules += [(re.escape(operator), 0, 'operator')
-            for operator in PythonSyntaxHighlighter._operators]
-        rules += [(re.escape(brace), 0, 'brace')
-            for brace in PythonSyntaxHighlighter._braces]
-
-        # Set up parts of a floating point number. Because it may start or end with a decimal
-        # point, a float doesn't necessarily start or end at a '\b' boundary.
-        digitPart = '(?:[0-9][0-9_]*)'
-        fraction = rf'(?:\.{digitPart})'
-        exponent = f'(?:[eE][+-]?{digitPart})'
-        digitsWithFraction = f'(?:{digitPart}?{fraction})'
-        digitsWithDot = rf'(?:{digitPart}\.)'
-        pointFloat = f'(?:{digitsWithFraction}|{digitsWithDot})'
-        exponentFloat = f'(?:{digitPart}|{pointFloat}){exponent}'
-        floatNumber = f'(?:{exponentFloat}|{pointFloat})'
-
-        # Add other rules.
-        rules += [
-            # Numeric literals:
-            (r'\b0[bB][0-1_]+\b', 0, 'number'),        # binary
-            (r'\b0[oO][0-7_]+\b', 0, 'number'),        # octal
-            (r'\b[1-9][0-9_]*\b', 0, 'number'),        # decimal
-            (r'\b0[xX][0-9A-Fa-f_]+\b', 0, 'number'),  # hexadecimal
-            (floatNumber, 0, 'number'),                # float
-            (rf'{floatNumber}[jJ]\b', 0, 'number'),    # imaginary
-
-            # Decorator ('@' followed by an identifier):
-            (r'@[\w.]+\b', 0, 'decorator'),
-
-            # Class or function definition ('class' or 'def' followed by an identifier):
-            (r'\b(class|def)\b\s*(\w+)', 2, 'definition'),
-
-            # The 'self' or 'cls' variable (not a keyword, but a common convention):
-            (r'\b(self|cls)\b', 0, 'self'),
-
-            # Double-quoted string, possibly containing escape sequences:
-            (stringOrBytePrefixes + r'"[^"\\]*(\\.[^"\\]*)*"', 0, 'string'),
-
-            # Single-quoted string, possibly containing escape sequences:
-            (stringOrBytePrefixes + r"'[^'\\]*(\\.[^'\\]*)*'", 0, 'string'),
-
-            # Comment (from '#' until the end of the line):
-            (r'#[^\n]*', 0, 'comment'),
-
-            # Common labels used at the start of a comment:
-            (r'#[ \t]*(TODO|BUG|FIXME|HACK|NOTE|XXX)', 1, 'todo'),
-        ]
-
-        # Store a regular expression in the rule for each pattern.
-        self._rules = [(QRegularExpression(pattern), index, style)
-            for (pattern, index, style) in rules]
-
-        # Create separate rules for escape sequences.
-        escapeRules = [(r'\\' + re.escape(char), 0, 'escapeSequence')
+        # Create patterns that match escape sequences within strings.
+        escapePatterns = [r'\\' + re.escape(char)
             for char in PythonSyntaxHighlighter._escapedCharacters]
-        escapeRules += [
-            (r'\\N\{[^}]+\}', 0, 'escapeSequence'),
-            (r'\\[0-7]{1,3}', 0, 'escapeSequence'),
-            (r'\\u[0-9A-Fa-f]{4}', 0, 'escapeSequence'),
-            (r'\\U[0-9A-Fa-f]{8}', 0, 'escapeSequence'),
+        escapePatterns += [
+            r'\\N\{[^}]+\}',
+            r'\\[0-7]{1,3}',
+            r'\\u[0-9A-Fa-f]{4}',
+            r'\\U[0-9A-Fa-f]{8}',
         ]
-        self._escapeRules = [(QRegularExpression(pattern), index, style)
-            for (pattern, index, style) in escapeRules]
+        escapeSequence = self._makeNamedAlternatives('escapeSequence', escapePatterns)
+
+        # Create a pattern for formatted replacements within strings.
+        # NOTE: This pattern isn't strictly correct; it should match balanced pairs of curly braces.
+        formattedReplacementPattern = self._makeNamedGroup('formattedReplacement', r'\{.*?\}')
+        formattedReplacement = r'\{\{|\}\}|' + formattedReplacementPattern
+
+        # Create patterns for string (and bytes) literals, possibly containing escape sequences.
+        # Bytes literals are prefixed by 'b', formatted string or bytes literals by 'f', and
+        # backward-compatible Unicode string literals by 'u' (lower- or uppercase).
+        stringOrBytesPrefix = self._makeNamedGroup('stringOrBytesPrefix', r'[BbFfUu]?')
+        stringStart = self._makeNamedAlternatives('stringStart', ["'''", '"""', "'", '"'])
+        stringEnd = self._makeNamedAlternatives('stringEnd', [r'(?P=stringStart)', r'\\?$'])
+        stringPattern = rf'{stringOrBytesPrefix}{stringStart}[^\\]*?(?:\\.[^\\]*?)*?{stringEnd}'
+        string = self._makeNamedGroup('string', stringPattern)
+
+        # Create patterns for raw string (and bytes) literals, with no escape sequences.
+        # Raw bytes literals are prefixed by 'rb', raw string literals by 'r', and raw formatted
+        # string literals by 'rf' (lower- or uppercase, any order).
+        rawStringOrBytesPrefix = self._makeNamedGroup('rawStringOrBytesPrefix', r'[Rr][BbFf]?|[BbFf][Rr]')
+        rawStringStart = self._makeNamedAlternatives('rawStringStart', ["'''", '"""', "'", '"'])
+        rawStringEnd = self._makeNamedAlternatives('rawStringEnd', [r'(?P=rawStringStart)', r'\\?$'])
+        rawStringPattern = rf'{rawStringOrBytesPrefix}{rawStringStart}[^\\]*?(?:\\.[^\\]*?)*?{rawStringEnd}'
+        rawString = self._makeNamedGroup('rawString', rawStringPattern)
+
+        # Create patterns that match numbers.
+        # NOTE: Match floats before decimal numbers, otherwise "7.e-3" only matches partially.
+        digitPart = r'(?:[0-9](?:_?[0-9])*)'
+        fraction = rf'(?:\.{digitPart})'
+        exponent = rf'(?:[eE][+-]?{digitPart})'
+        digitsWithFraction = rf'(?:(?:\b{digitPart})?{fraction})'
+        digitsWithDot = rf'(?:\b{digitPart}\.)'
+        pointFloat = rf'(?:{digitsWithFraction}|{digitsWithDot})'
+        exponentFloat = rf'(?:{digitPart}|{pointFloat}){exponent}'
+        floatNumber = rf'(?:{exponentFloat}|{pointFloat})'
+        floatOrImaginaryNumber = rf'{floatNumber}(?:[jJ]\b)?'
+        binaryNumber = r'\b0[bB](?:_?[01])+\b'
+        octalNumber = r'\b0[oO](?:_?[0-7])+\b'
+        decimalNumber = r'\b[1-9](?:_?[0-9])*\b|\b0+(?:_?0)*\b'
+        hexadecimalNumber = r'\b0[xX](?:_?[0-9A-Fa-f])+\b'
+        number = self._makeNamedAlternatives('number',
+            [floatOrImaginaryNumber, binaryNumber, octalNumber, decimalNumber, hexadecimalNumber])
+
+        # Create a pattern that matches a class or function definition.
+        identifier = self._makeNamedGroup('identifier', r'\w+')
+        definition = self._makeNamedGroup('definition', rf'\b(?:class|def)\b\s*{identifier}')
+
+        # Create patterns that match keywords, operators, and braces.
+        keywords = self._makeNamedAlternatives('keyword',
+            [rf'\b{word}\b' for word in keyword.kwlist])
+        operators = self._makeNamedAlternatives('operator',
+            [re.escape(op) for op in PythonSyntaxHighlighter._operators])
+        braces = self._makeNamedAlternatives('brace',
+            [re.escape(brace) for brace in PythonSyntaxHighlighter._braces])
+
+        # Create a pattern that matches a decorator ('@' followed by an identifier).
+        decorator = self._makeNamedGroup('decorator', r'@[\w.]+\b')
+
+        # Create a pattern for 'self' and 'cls' variables (not keywords, but common conventions).
+        selfOrCls = self._makeNamedAlternatives('self', [r'\bself\b', r'\bcls\b'])
+
+        # Combine all the top-level patterns into one regular expression.
+        code = self._makeNamedAlternatives('code', [comment, string, rawString, number, definition,
+            keywords, operators, braces, decorator, selfOrCls])
+        self._code = re.compile(code)
+
+        # Create regular expressions for sub-patterns that appear only in particular contexts.
+        self._subpatterns = {
+            'comment': [(re.compile(todo), 'todo')],
+            'definition': [(re.compile(definition), 'identifier')],
+            'string': [(re.compile(escapeSequence), 'escapeSequence')],
+        }
+        self._formattedReplacementSubpattern = re.compile(formattedReplacement)
+
+    def _makeNamedGroup(self, name: str, pattern: str) -> str:
+        '''Returns a regular expression string for a named group matching the given pattern.'''
+        return f'(?P<{name}>{pattern})'
+
+    def _makeNamedAlternatives(self, name: str, alternatives: list) -> str:
+        '''Returns a regular expression string for a named group matching any of the given
+        alternative patterns.'''
+        joinedAlternatives = '|'.join(alternatives)
+        return self._makeNamedGroup(name, joinedAlternatives)
+
+    def _makeUnnamedAlternatives(self, name: str, alternatives: list) -> str:
+        '''Returns a regular expression string matching any of the given alternative patterns.'''
+        joinedAlternatives = '|'.join(alternatives)
+        return f'(?:{joinedAlternatives})'
 
     def highlightBlock(self, text: str) -> None:
         '''Applies syntax highlighting to the given block of text.'''
 
-        # Apply each of our syntax highlighting rules to the text.
-        self._applyRules(text, self._rules)
-
-        # Check for multiline strings.
-        self.setCurrentBlockState(0)
-        self._highlightMultilineStrings(text)
-
-        # Apply our separate rules for escape sequences.
-        self._applyRules(text, self._escapeRules)
-
-    def _applyRules(self, text: str, rules: list):
-        '''Applies regular-expression-based syntax highlighting rules.'''
-        for expression, nth, style in rules:
-            matchIterator = expression.globalMatch(text)
-            while matchIterator.hasNext():
-                match = matchIterator.next()
-                start = match.capturedStart(nth)
-                length = match.capturedLength(nth)
-                self.setFormat(start, length, STYLES[style])
-
-    def _highlightMultilineStrings(self, text: str) -> None:
-        '''Highlights multiline strings.'''
-        # If we're already inside a triple-quoted string, look for the ending triple-quote.
+        # If the previous block state indicates that we're starting in the middle of an unclosed
+        # string, prepend the appropriate quote to the current text line. Keep track of the
+        # offset required when formatting text.
         state = self.previousBlockState()
-        if state > 0:
-            start = 0
-            end = 0
-            regexp = self._threeSingleQuotes if state == 1 else self._threeDoubleQuotes
-            match = regexp.match(text, end)
-            if match.hasMatch():
-                length = match.capturedEnd() - start
-                self.setCurrentBlockState(0)
-            else:
-                length = len(text) - start
-                self.setCurrentBlockState(state)
-            self.setFormat(start, length, STYLES['multilineString'])
-        else:
-            start = 0
-            length = 0
+        initialQuote = self._getInitialQuoteFromBlockState(state)
+        text = initialQuote + text
+        offset = len(initialQuote)
 
-        # As long as there's a delimiter match on this line...
-        match = self._multilineStringStart.match(text, start + length)
-        while match.hasMatch():
-            state = 1 if match.capturedLength(1) else 2
-            start = match.capturedStart()
-            end = match.capturedEnd()
+        # Iterate over matches on the current line of text.
+        self.setCurrentBlockState(-1)
+        for match in self._code.finditer(text):
+            # See which role is played by the current match.
+            for role in STYLES.keys():
+                try:
+                    start, end = match.span(role)
+                    if start >= 0 and end > start:
+                        # We found a role for the current match. Apply the corresponding style.
+                        clampedStart = max(0, start - offset)
+                        clampedEnd = max(0, end - offset)
+                        self.setFormat(clampedStart, clampedEnd - clampedStart, STYLES[role])
 
-            # Look for the ending delimiter.
-            regexp = self._threeSingleQuotes if state == 1 else self._threeDoubleQuotes
-            match = regexp.match(text, end)
-            if match.hasMatch():
-                length = match.capturedEnd() - start
-                self.setCurrentBlockState(0)
-            else:
-                length = len(text) - start
-                self.setCurrentBlockState(state)
-            self.setFormat(start, length, STYLES['multilineString'])
+                        # Now highlight any subpatterns within the span covered by this role.
+                        self._highlightSubpatterns(text, start, end, offset, role)
 
-            # Look for the next match.
-            match = self._multilineStringStart.match(text, start + length)
+                        # For formatted strings, also highlight the subpattern for
+                        # formatted replacements.
+                        if ((role == 'string' or role == 'rawString') and
+                            'f' in match.group(role + 'OrBytesPrefix').lower()):
+                            self._highlightSubpattern(text, start, end, offset,
+                                self._formattedReplacementSubpattern, 'formattedReplacement')
+
+                        # Check to see whether the current line ends with an unclosed string.
+                        if ((role == 'string' or role == 'rawString') and end == len(text) and
+                            match.group(role + 'End') != match.group(role + 'Start')):
+                            # If so, set the block state so we'll remember for the next line.
+                            state = self._getBlockStateFromStringMatch(role, match)
+                            self.setCurrentBlockState(state)
+                        break
+                except:
+                    pass
+
+    def _getBlockStateFromStringMatch(self, role: str, match: re.Match) -> int:
+        '''Encodes information about an unclosed string (whether it starts with one or three quotes,
+        whether they are single- or double-quotes, whether the prefix specifies a raw string, a 
+        formatted string, or a bytes literal) in an integer.'''
+        quote = match.group(role + 'Start')
+        isDoubleQuote = quote.startswith('"')
+        isLongString = len(quote) == 3
+        prefix = match.group(role + 'OrBytesPrefix').lower()
+        isBytes = 'b' in prefix
+        isFormatted = 'f' in prefix
+        isRaw = 'r' in prefix
+        return ((1 if isDoubleQuote else 0) | (2 if isLongString else 0) | (4 if isBytes else 0) |
+            (8 if isFormatted else 0) | (16 if isRaw else 0))
+
+    def _getInitialQuoteFromBlockState(self, state: int) -> str:
+        '''Decodes information about an unclosed string (whether it starts with one or three quotes,
+        whether they are single- or double-quotes, whether the prefix specifies a raw string, a 
+        formatted string, or a bytes literal), returning the appropriate initial quote.'''
+        if state < 0:
+            return ''
+        quote = '"' if (state & 1) else "'"
+        quote = quote * (3 if (state & 2) else 1)
+        quote = ('b' if (state & 4) else '') + quote
+        quote = ('f' if (state & 8) else '') + quote
+        quote = ('r' if (state & 16) else '') + quote
+        quote += ' '
+        return quote
+
+    def _highlightSubpatterns(self, text: str, start: int, end: int, offset: int, role: str) -> None:
+        if role in self._subpatterns:
+            for subpattern, subrole in self._subpatterns[role]:
+                self._highlightSubpattern(text, start, end, offset, subpattern, subrole)
+
+    def _highlightSubpattern(self, text: str, start: int, end: int, offset: int,
+        subpattern: re.Pattern, subrole: str) -> None:
+        for match in subpattern.finditer(text, start, end):
+            substart, subend = match.span(subrole)
+            if substart >= 0 and subend > substart:
+                clampedStart = max(0, substart - offset)
+                clampedEnd = max(0, subend - offset)
+                self.setFormat(clampedStart, clampedEnd - clampedStart, STYLES[subrole])
