@@ -300,6 +300,8 @@ class MainWindow(QMainWindow):
                 extraSelection.cursor = cursor
                 self._sourceTextViewer.setExtraSelections([extraSelection])
                 self._sourceTextViewer.centerCursor()
+            else:
+                self._sourceTextViewer.setExtraSelections([])
         except:
             self._displaySourceError('Could not open file.')
 
