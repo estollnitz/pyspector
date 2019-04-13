@@ -3,11 +3,13 @@ import inspect
 import platform
 from html import escape
 from markdown import markdown
-from PyQt5.QtCore import (Qt, QSortFilterProxyModel, QRegularExpression, QUrl, QModelIndex)
-from PyQt5.QtGui import (QStandardItemModel, QStandardItem, QFont, QColor, QTextCursor, QTextFormat)
+from PyQt5.QtCore import (Qt, QSortFilterProxyModel, QRegularExpression, QUrl, QModelIndex,
+    QItemSelectionModel)
+from PyQt5.QtGui import (QStandardItemModel, QStandardItem, QFont, QColor, QTextCursor, QTextFormat,
+    QKeySequence)
 from PyQt5.QtWidgets import (QApplication, QLineEdit, QWidget, QHBoxLayout, QVBoxLayout,
     QTextBrowser, QSplitter, QMainWindow, QAction, QCheckBox, QPushButton, QPlainTextEdit,
-    QTextEdit)
+    QTextEdit, QShortcut)
 import webbrowser
 
 # Local imports:
@@ -126,36 +128,60 @@ class MainWindow(QMainWindow):
         centralWidget.setLayout(centralLayout)
         self.setCentralWidget(centralWidget)
 
+        # Create keyboard shortcuts.
+        findShortcut = QShortcut(QKeySequence.Find, centralWidget)
+        findShortcut.activated.connect(self._findShortcutActivated)
+
         # Show the window.
         self.show()
+
+    def _findShortcutActivated(self) -> None:
+        self._searchEdit.selectAll()
+        self._searchEdit.setFocus()
 
     def _searchEditTextChanged(self, text: str) -> None:
         '''Filters the tree view to show just those items relevant to the search text.'''
         self._model.searchText = text
+        self._selectFirstMatch()
 
     def _matchCaseCheckBoxStateChanged(self, state: Qt.CheckState) -> None:
         '''Determines whether matching is case-sensitive.'''
         isChecked = state == Qt.Checked
         self._config.matchCase = isChecked
         self._model.matchCase = isChecked
+        self._selectFirstMatch()
 
     def _includePrivateCheckBoxStateChanged(self, state: Qt.CheckState) -> None:
         ''' Includes or excludes private members from the tree view.'''
         isChecked = state == Qt.Checked
         self._config.includePrivateMembers = isChecked
         self._model.includePrivateMembers = isChecked
+        self._selectFirstMatch()
 
     def _includeInheritedCheckBoxStateChanged(self, state: Qt.CheckState) -> None:
         ''' Includes or excludes inherited members from the tree view.'''
         isChecked = state == Qt.Checked
         self._config.includeInheritedMembers = isChecked
         self._model.includeInheritedMembers = isChecked
+        self._selectFirstMatch()
 
     def _sortByTypeCheckBoxStateChanged(self, state: Qt.CheckState) -> None:
         ''' Includes or excludes private members from the tree view.'''
         isChecked = state == Qt.Checked
         self._config.sortByType = isChecked
         self._model.sortByType = isChecked
+
+    def _selectFirstMatch(self) -> None:
+        # Select the first match to the current search text (if any).
+        searchText = self._model.searchText
+        index = self._model.findItemByName(searchText) if len(searchText) else QModelIndex()
+        if index.isValid():
+            self._treeView.expandAll()
+            self._treeView.scrollTo(index)
+            self._treeView.selectionModel().select(index, QItemSelectionModel.ClearAndSelect)
+            self._treeViewSelectionChanged(index, QModelIndex())
+        else:
+            self._treeView.collapseAll()
 
     def _treeViewSelectionChanged(self, index: QModelIndex, oldIndex: QModelIndex) -> None:
         '''Determines which object was selected and displays appropriate info.'''
@@ -323,7 +349,7 @@ class MainWindow(QMainWindow):
             # Clear the search and select the item (if present in the tree).
             self._searchEdit.clear()
             self._model.searchText = ''
-            index = self._model.findItem(url.path())
+            index = self._model.findItemById(url.path())
             if index.isValid():
                 self._treeView.setCurrentIndex(index)
 
@@ -337,3 +363,4 @@ class MainWindow(QMainWindow):
             moduleNames = self._moduleSelectionDialog.selectedModuleNames
             self._model.setModuleNames(moduleNames)
             self._config.moduleNames = moduleNames
+            self._selectFirstMatch()

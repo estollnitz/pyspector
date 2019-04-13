@@ -155,28 +155,43 @@ class MainModel():
             print(f'{indent}{id}')
             self._dumpTree(index, depth + 1)
 
-    def findItem(self, id: str) -> QModelIndex:
-        '''Finds the item with the specified ID.'''
-        print(f'looking for item with id {id}')
-        index = self._findItem(QModelIndex(), id)
-        if index.isValid():
-            # Convert unfiltered index to a filtered index.
-            intermediateIndex = self._intermediateTreeModel.mapFromSource(index)
-            secondIntermediateIndex = self._secondIntermediateTreeModel.mapFromSource(intermediateIndex)
-            filteredIndex = self._filteredTreeModel.mapFromSource(secondIntermediateIndex)
-            return filteredIndex
+    def findItemByName(self, name: str) -> QModelIndex:
+        '''Finds the item with the specified name.'''
+
+        # Create search predicates for matching and containing name.
+        if self.matchCase:
+            itemHasName = lambda item: item.text() == name
+            itemContainsName = lambda  item: name in item.text()
+        else:
+            nameNoCase = name.casefold()
+            itemHasName = lambda item: item.text().casefold() == nameNoCase
+            itemContainsName = lambda item: nameNoCase in item.text().casefold()
+
+        # Try for a full match, then a partial match.
+        for predicate in [itemHasName, itemContainsName]:
+            index = self._findItem(QModelIndex(), predicate)
+            if index.isValid():
+                break
+
         return index
 
-    def _findItem(self, parentIndex: QModelIndex, id: str) -> QModelIndex:
-        rowCount = self._treeModel.rowCount(parentIndex)
+    def findItemById(self, id: str) -> QModelIndex:
+        '''Finds the item with the specified ID.'''
+        print(f'looking for item with id {id}')
+        predicate = lambda item: item.data()['id'] == id
+        index = self._findItem(QModelIndex(), predicate)
+        return index
+
+    def _findItem(self, parentIndex: QModelIndex, predicate) -> QModelIndex:
+        rowCount = self._filteredTreeModel.rowCount(parentIndex)
         for row in range(rowCount):
-            index = self._treeModel.index(row, 0, parentIndex)
+            index = self._filteredTreeModel.index(row, 0, parentIndex)
             # Check this item.
-            item = self._treeModel.itemFromIndex(index)
-            if item.data()['id'] == id:
+            item = self.getItemFromIndex(index)
+            if predicate(item):
                 return index
             # Recurse into children.
-            childIndex = self._findItem(index, id)
+            childIndex = self._findItem(index, predicate)
             if childIndex.isValid():
                 return childIndex
         return QModelIndex()

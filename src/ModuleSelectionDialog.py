@@ -1,7 +1,7 @@
 # External imports:
 from PyQt5.QtCore import Qt, QSortFilterProxyModel
-from PyQt5.QtGui import QStandardItem, QStandardItemModel
-from PyQt5.QtWidgets import QDialog, QDialogButtonBox, QLabel, QLineEdit, QVBoxLayout
+from PyQt5.QtGui import QKeySequence, QStandardItem, QStandardItemModel
+from PyQt5.QtWidgets import QDialog, QDialogButtonBox, QLabel, QLineEdit, QShortcut, QVBoxLayout
 
 # Local imports:
 from ModuleSelectionModel import ModuleSelectionModel
@@ -49,6 +49,10 @@ class ModuleSelectionDialog(QDialog):
         mainLayout.addWidget(buttonBox)
         self.setLayout(mainLayout)
 
+        # Create keyboard shortcuts.
+        findShortcut = QShortcut(QKeySequence.Find, self)
+        findShortcut.activated.connect(self._findShortcutActivated)
+
     @property
     def selectedModuleNames(self):
         '''The list of selected module names.'''
@@ -86,6 +90,10 @@ class ModuleSelectionDialog(QDialog):
             item2.setEditable(False)
             parentItem.appendRow((item1, item2))
             self._createItems(item1, moduleData.children)
+
+    def _findShortcutActivated(self) -> None:
+        self._searchEdit.selectAll()
+        self._searchEdit.setFocus()
 
     def _searchEditTextChanged(self, text: str) -> None:
         '''Filters the tree view to show just those items relevant to the search text.'''
