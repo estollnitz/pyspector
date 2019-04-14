@@ -3,13 +3,11 @@ import inspect
 import platform
 from html import escape
 from markdown import markdown
-from PyQt5.QtCore import (Qt, QSortFilterProxyModel, QRegularExpression, QUrl, QModelIndex,
-    QItemSelectionModel)
-from PyQt5.QtGui import (QStandardItemModel, QStandardItem, QFont, QColor, QTextCursor, QTextFormat,
-    QKeySequence)
-from PyQt5.QtWidgets import (QApplication, QLineEdit, QWidget, QHBoxLayout, QVBoxLayout,
-    QTextBrowser, QSplitter, QMainWindow, QAction, QCheckBox, QPushButton, QPlainTextEdit,
-    QTextEdit, QShortcut)
+from PyQt5.QtCore import Qt, QItemSelectionModel, QModelIndex, QUrl
+from PyQt5.QtGui import (QColor, QFont, QKeySequence, QStandardItem, QStandardItemModel,
+    QTextCursor, QTextFormat)
+from PyQt5.QtWidgets import (QAction, QCheckBox, QHBoxLayout, QMainWindow, QPlainTextEdit,
+    QPushButton, QShortcut, QSplitter, QTextBrowser, QTextEdit, QVBoxLayout, QWidget)
 import webbrowser
 
 # Local imports:
@@ -18,8 +16,9 @@ from MainModel import MainModel
 from ModuleSelectionDialog import ModuleSelectionDialog
 from PythonSyntaxHighlighter import PythonSyntaxHighlighter
 from rstToHtml import rstToHtml
+from SearchEdit import SearchEdit
 from TreeView import TreeView
-from utilities import openFile
+import utilities
 
 class MainWindow(QMainWindow):
     '''The main window of the application.'''
@@ -44,10 +43,9 @@ class MainWindow(QMainWindow):
         self.setGeometry(100, 100, 1200, 800)
 
         # Crete user interface widgets.
-        self._searchEdit = QLineEdit()
-        self._searchEdit.setClearButtonEnabled(True)
-        self._searchEdit.setPlaceholderText('Search')
+        self._searchEdit = SearchEdit()
         self._searchEdit.textChanged.connect(self._searchEditTextChanged)
+        self._searchEdit.delayedTextChanged.connect(self._selectFirstMatch)
 
         matchCaseCheckBox = QCheckBox()
         matchCaseCheckBox.setText('Match case')
@@ -142,7 +140,6 @@ class MainWindow(QMainWindow):
     def _searchEditTextChanged(self, text: str) -> None:
         '''Filters the tree view to show just those items relevant to the search text.'''
         self._model.searchText = text
-        self._selectFirstMatch()
 
     def _matchCaseCheckBoxStateChanged(self, state: Qt.CheckState) -> None:
         '''Determines whether matching is case-sensitive.'''
@@ -182,10 +179,13 @@ class MainWindow(QMainWindow):
             self._treeViewSelectionChanged(index, QModelIndex())
         else:
             self._treeView.collapseAll()
+            selectedIndexes = self._treeView.selectedIndexes()
+            if len(selectedIndexes):
+                self._treeView.scrollTo(selectedIndexes[0])
 
     def _treeViewSelectionChanged(self, index: QModelIndex, oldIndex: QModelIndex) -> None:
         '''Determines which object was selected and displays appropriate info.'''
-        item = self._model.getItemFromIndex(index)
+        item = utilities.getItemFromIndex(self._model.filteredTreeModel, index)
         if item:
             self._displayInfo(item)
         else:
@@ -341,7 +341,7 @@ class MainWindow(QMainWindow):
         scheme = url.scheme()
         if scheme == 'file':
             # Open the file in an external application.
-            openFile(url.path())
+            utilities.openFile(url.path())
         elif scheme == 'http' or scheme == 'https':
             # Open the web page in the default browser.
             webbrowser.open_new_tab(url.toString())

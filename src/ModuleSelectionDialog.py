@@ -1,11 +1,13 @@
 # External imports:
-from PyQt5.QtCore import Qt, QSortFilterProxyModel
+from PyQt5.QtCore import Qt, QItemSelectionModel, QSortFilterProxyModel
 from PyQt5.QtGui import QKeySequence, QStandardItem, QStandardItemModel
 from PyQt5.QtWidgets import QDialog, QDialogButtonBox, QLabel, QLineEdit, QShortcut, QVBoxLayout
 
 # Local imports:
 from ModuleSelectionModel import ModuleSelectionModel
+from SearchEdit import SearchEdit
 from TreeView import TreeView
+import utilities
 
 class ModuleSelectionDialog(QDialog):
     '''A dialog for choosing which modules to inspect.'''
@@ -23,10 +25,9 @@ class ModuleSelectionDialog(QDialog):
         label = QLabel()
         label.setText('Select modules')
 
-        self._searchEdit = QLineEdit()
-        self._searchEdit.setClearButtonEnabled(True)
-        self._searchEdit.setPlaceholderText('Search')
+        self._searchEdit = SearchEdit()
         self._searchEdit.textChanged.connect(self._searchEditTextChanged)
+        self._searchEdit.delayedTextChanged.connect(self._selectFirstMatch)
 
         self._treeView = TreeView()
         self._treeView.setModel(self._sortFilterProxyModel)
@@ -97,7 +98,29 @@ class ModuleSelectionDialog(QDialog):
 
     def _searchEditTextChanged(self, text: str) -> None:
         '''Filters the tree view to show just those items relevant to the search text.'''
+        self._searchText = text
         self._sortFilterProxyModel.setFilterFixedString(text)
+
+    def _selectFirstMatch(self) -> None:
+        # Select the first match to the current search text (if any).
+        if len(self._searchText):
+            searchTextNoCase = self._searchText.casefold()
+            itemHasName = lambda item: item.text().casefold() == searchTextNoCase
+            itemContainsName = lambda item: searchTextNoCase in item.text().casefold()
+            for predicate in [itemHasName, itemContainsName]:
+                index = utilities.findIndexInModel(self._sortFilterProxyModel, predicate)
+                if index.isValid():
+                    self._treeView.expandAll()
+                    self._treeView.scrollTo(index)
+                    self._treeView.selectionModel().select(index, QItemSelectionModel.Rows |
+                        QItemSelectionModel.SelectCurrent)
+                    return
+
+        # If there's no match (or no search text), collapse everything except the selection.
+        self._treeView.collapseAll()
+        selectedIndexes = self._treeView.selectedIndexes()
+        if len(selectedIndexes):
+            self._treeView.scrollTo(selectedIndexes[0])
 
     def _acceptButtonPressed(self) -> None:
         '''Gathers a list of selected module names and closes the dialog.'''

@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QTreeView
 class TreeView(QTreeView):
     '''Slightly customizes keyboard handling of QTreeView.'''
 
-    def keyPressEvent(self, event: QKeyEvent):
+    def keyPressEvent(self, event: QKeyEvent) -> None:
         '''Handles key press events, using the left arrow key to collapse items.'''
         currentIndex: QModelIndex = self.currentIndex()
         if event.key() == Qt.Key_Left and currentIndex.isValid():

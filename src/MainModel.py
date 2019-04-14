@@ -1,8 +1,12 @@
+# External imports:
 import importlib
 import inspect
 from os.path import dirname
 from PyQt5.QtCore import QSortFilterProxyModel, QRegularExpression, QModelIndex
 from PyQt5.QtGui import QStandardItemModel, QStandardItem, QIcon, QBrush, QColor
+
+# Local imports:
+import utilities
 
 class MainModel():
     '''Data model for pyspector.'''
@@ -114,14 +118,6 @@ class MainModel():
         self._sortByType = value
         self._sort()
 
-    def getItemFromIndex(self, index: QModelIndex) -> QStandardItem:
-        '''Returns the model item corresponding to the given index.'''
-        secondIntermediateIndex = self._filteredTreeModel.mapToSource(index)
-        intermediateIndex = self._secondIntermediateTreeModel.mapToSource(secondIntermediateIndex)
-        unfilteredIndex = self._intermediateTreeModel.mapToSource(intermediateIndex)
-        item = self._treeModel.itemFromIndex(unfilteredIndex)
-        return item
-
     def setModuleNames(self, moduleNames) -> None:
         '''Adds the specified modules to the tree, removing any that are no longer needed.'''
         # Remove any modules that aren't in the list.
@@ -169,7 +165,7 @@ class MainModel():
 
         # Try for a full match, then a partial match.
         for predicate in [itemHasName, itemContainsName]:
-            index = self._findItem(QModelIndex(), predicate)
+            index = utilities.findIndexInModel(self._filteredTreeModel, predicate)
             if index.isValid():
                 break
 
@@ -179,22 +175,8 @@ class MainModel():
         '''Finds the item with the specified ID.'''
         print(f'looking for item with id {id}')
         predicate = lambda item: item.data()['id'] == id
-        index = self._findItem(QModelIndex(), predicate)
+        index = utilities.findIndexInModel(self._filteredTreeModel, predicate)
         return index
-
-    def _findItem(self, parentIndex: QModelIndex, predicate) -> QModelIndex:
-        rowCount = self._filteredTreeModel.rowCount(parentIndex)
-        for row in range(rowCount):
-            index = self._filteredTreeModel.index(row, 0, parentIndex)
-            # Check this item.
-            item = self.getItemFromIndex(index)
-            if predicate(item):
-                return index
-            # Recurse into children.
-            childIndex = self._findItem(index, predicate)
-            if childIndex.isValid():
-                return childIndex
-        return QModelIndex()
 
     def _addModule(self, moduleName, depth = 0):
         # Check to see if module has already been added.
