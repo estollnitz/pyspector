@@ -1,6 +1,6 @@
 # External imports:
 from PyQt5.QtCore import pyqtSignal, Qt, QObject, QTimer
-from PyQt5.QtGui import QKeyEvent
+from PyQt5.QtGui import QKeyEvent, QKeySequence
 from PyQt5.QtWidgets import QLineEdit
 
 class SearchEdit(QLineEdit):
@@ -14,7 +14,8 @@ class SearchEdit(QLineEdit):
         self._timer.setSingleShot(True)
 
         self.setClearButtonEnabled(True)
-        self.setPlaceholderText('Search')
+        shortcutText = QKeySequence(QKeySequence.Find).toString(QKeySequence.NativeText)
+        self.setPlaceholderText(f'Search ({shortcutText})')
         self.textChanged.connect(self._restartTimer)
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
