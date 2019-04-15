@@ -3,6 +3,7 @@ Color syntax highlighting for the Python language.
 '''
 
 # External imports:
+from enum import Enum
 import re
 import sys
 import keyword
@@ -18,30 +19,35 @@ def format(colorName: str, style: str = '') -> QTextCharFormat:
         charFormat.setFontItalic(True)
     return charFormat
 
-# Styles for various parts of the language:
+# Styles for various parts of the language, each consisting of a light-themed format and a
+# dark-themed format:
 STYLES = {
     # A comment may contain todo items.
-    'comment': format('green', 'italic'),
-    'todo': format('red', 'italic'),
+    'comment': (format('green', 'italic'), format('seaGreen', 'italic')),
+    'todo': (format('red', 'italic'), format('darkkhaki', 'italic')),
 
     # A string may contain escape sequences; a formatted string may contain formatted replacements.
-    'string': format('darkRed'),
-    'rawString': format('firebrick'),
-    'escapeSequence': format('chocolate'),
-    'formattedReplacement': format('steelBlue'),
+    'string': (format('darkRed'), format('sienna')),
+    'rawString': (format('firebrick'), format('brown')),
+    'escapeSequence': (format('chocolate'), format('chocolate')),
+    'formattedReplacement': (format('steelBlue'), format('steelBlue')),
 
     # A definition contains an identifier.
-    'definition': format('blue'),
-    'identifier': format('black', 'bold'),
+    'definition': (format('blue'), format('steelBlue')),
+    'identifier': (format('black', 'bold'), format('white', 'bold')),
 
     # Additional parts of the language:
-    'brace': format('darkSlateGray'),
-    'decorator': format('steelBlue'),
-    'keyword': format('blue'),
-    'operator': format('indigo'),
-    'number': format('darkGreen'),
-    'self': format('purple', 'italic'),
+    'brace': (format('darkSlateGray'), format('gray')),
+    'decorator': (format('steelBlue'), format('cadetBlue')),
+    'keyword': (format('blue'), format('steelBlue')),
+    'operator': (format('indigo'), format('aliceBlue')),
+    'number': (format('darkGreen'), format('darkSeaGreen')),
+    'self': (format('purple', 'italic'), format('mediumOrchid', 'italic')),
 }
+
+class Theme(Enum):
+    LIGHT = 0
+    DARK = 1
 
 class PythonSyntaxHighlighter(QSyntaxHighlighter):
     '''A syntax highlighter for the Python language.'''
@@ -72,6 +78,8 @@ class PythonSyntaxHighlighter(QSyntaxHighlighter):
     def __init__(self, document):
         '''Initializes a PythonSyntaxHighlighter instance.'''
         super().__init__(document)
+
+        self._theme = Theme.DARK
 
         # Create a pattern that matches a comment (from '#' until the end of the line), and a
         # subpattern for common labels used within comments.
@@ -162,6 +170,15 @@ class PythonSyntaxHighlighter(QSyntaxHighlighter):
         }
         self._formattedReplacementSubpattern = re.compile(formattedReplacement)
 
+    @property
+    def theme(self) -> Theme:
+        return self._theme
+
+    @theme.setter
+    def theme(self, value: Theme) -> None:
+        self._theme = value
+        self.rehighlight()
+
     def _makeNamedGroup(self, name: str, pattern: str) -> str:
         '''Returns a regular expression string for a named group matching the given pattern.'''
         return f'(?P<{name}>{pattern})'
@@ -199,7 +216,8 @@ class PythonSyntaxHighlighter(QSyntaxHighlighter):
                         # We found a role for the current match. Apply the corresponding style.
                         clampedStart = max(0, start - offset)
                         clampedEnd = max(0, end - offset)
-                        self.setFormat(clampedStart, clampedEnd - clampedStart, STYLES[role])
+                        textFormat = STYLES[role][self.theme.value]
+                        self.setFormat(clampedStart, clampedEnd - clampedStart, textFormat)
 
                         # Now highlight any subpatterns within the span covered by this role.
                         self._highlightSubpatterns(text, start, end, offset, role)
@@ -261,4 +279,5 @@ class PythonSyntaxHighlighter(QSyntaxHighlighter):
             if substart >= 0 and subend > substart:
                 clampedStart = max(0, substart - offset)
                 clampedEnd = max(0, subend - offset)
-                self.setFormat(clampedStart, clampedEnd - clampedStart, STYLES[subrole])
+                textFormat = STYLES[subrole][self.theme.value]
+                self.setFormat(clampedStart, clampedEnd - clampedStart, textFormat)

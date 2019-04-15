@@ -3,7 +3,7 @@ import inspect
 import platform
 from html import escape
 from markdown import markdown
-from PyQt5.QtCore import Qt, QItemSelectionModel, QModelIndex, QUrl
+from PyQt5.QtCore import Qt, QEvent, QItemSelectionModel, QModelIndex, QUrl
 from PyQt5.QtGui import (QColor, QFont, QKeySequence, QStandardItem, QStandardItemModel,
     QTextCursor, QTextFormat)
 from PyQt5.QtWidgets import (QAction, QCheckBox, QHBoxLayout, QMainWindow, QPlainTextEdit,
@@ -14,7 +14,7 @@ import webbrowser
 from Config import Config
 from MainModel import MainModel
 from ModuleSelectionDialog import ModuleSelectionDialog
-from PythonSyntaxHighlighter import PythonSyntaxHighlighter
+from PythonSyntaxHighlighter import PythonSyntaxHighlighter, Theme
 from rstToHtml import rstToHtml
 from SearchEdit import SearchEdit
 from TreeView import TreeView
@@ -130,6 +130,9 @@ class MainWindow(QMainWindow):
         findShortcut = QShortcut(QKeySequence.Find, centralWidget)
         findShortcut.activated.connect(self._findShortcutActivated)
 
+        # Make sure colors are correct for current palette.
+        self._updateColors()
+
         # Show the window.
         self.show()
 
@@ -176,15 +179,39 @@ class MainWindow(QMainWindow):
             self._treeView.expandAll()
             self._treeView.scrollTo(index)
             self._treeView.selectionModel().select(index, QItemSelectionModel.ClearAndSelect)
-            self._treeViewSelectionChanged(index, QModelIndex())
+            self._updateInfo(index)
         else:
             self._treeView.collapseAll()
             selectedIndexes = self._treeView.selectedIndexes()
             if len(selectedIndexes):
                 self._treeView.scrollTo(selectedIndexes[0])
 
+    def changeEvent(self, event: QEvent) -> None:
+        '''Updates colors when palette change events occur.'''
+        if event.type() == QEvent.PaletteChange:
+            self._updateColors()
+
+    def _updateColors(self) -> None:
+        '''Modifies colors when the palette changes from dark to light or vice versa.'''
+        isDark = self.palette().window().color().valueF() < 0.5
+        textColor = 'silver' if isDark else 'black'
+        linkColor = 'steelBlue' if isDark else 'blue'
+        self._textBrowser.document().setDefaultStyleSheet(f'* {{ color: {textColor}; }} a {{ color: {linkColor}; }}')
+        self._updateInfo()
+        self._sourceTextViewer.setStyleSheet(f'QPlainTextEdit {{ color: {textColor}; }}')
+        self._sourceTextHighlighter.theme = Theme.DARK if isDark else Theme.LIGHT
+
     def _treeViewSelectionChanged(self, index: QModelIndex, oldIndex: QModelIndex) -> None:
-        '''Determines which object was selected and displays appropriate info.'''
+        '''Displays appropriate information whenever the tree view selection changes.'''
+        self._updateInfo(index)
+
+    def _updateInfo(self, index: QModelIndex = QModelIndex()) -> None:
+        '''Determines which object is selected and displays appropriate info.'''
+        if not index.isValid():
+            selectedIndexes = self._treeView.selectedIndexes()
+            if len(selectedIndexes):
+                index = selectedIndexes[0]
+
         item = utilities.getItemFromIndex(self._model.filteredTreeModel, index)
         if item:
             self._displayInfo(item)

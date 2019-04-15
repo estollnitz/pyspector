@@ -1,6 +1,5 @@
 '''
 Sample code to test PythonSyntaxHighlighter.
-
 '''
 
 # Comments:
