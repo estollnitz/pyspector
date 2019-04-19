@@ -224,8 +224,16 @@ class MainModel():
             # Check inheritance of class members.
             inheritance = 'inherited' if inspect.isclass(obj) and memberName not in obj.__dict__ else ''
 
+            # For functions, try to include the signature in the name.
+            name = memberName
+            if memberType == 'function':
+                try:
+                    name += str(inspect.signature(memberValue))
+                except:
+                    pass
+
             # Add an item for the current member.
-            item = self._addItem(parentItem, id, memberName, memberType, memberValue, inheritance)
+            item = self._addItem(parentItem, id, name, memberType, memberValue, inheritance)
 
             # Recurse into classes (but not if it's the same class we're inspecting).
             if 'class' in memberType and memberValue != obj:
